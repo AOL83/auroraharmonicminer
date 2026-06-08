@@ -249,6 +249,7 @@
       hashRateHps: 0,
       sharesFound: 0,
       lastHash: null,
+      btcLastHeartbeatAt: 0,
       harmonic: null,
       harmonicMode: "harmonic-only",
       harmonicThreshold: 0.65,
@@ -1534,7 +1535,8 @@
             harmonicMode=payload.harmonicMode || 'harmonic-only';
             harmonicThreshold=Number(payload.harmonicThreshold || 0.65);
             running=true;
-            loop();
+            postMessage({type:'btc_worker_started',payload:{workerIndex,workerCount,harmonicMode,harmonicThreshold}});
+            loop().catch(err => postMessage({type:'btc_worker_error',payload:{message:String(err && err.message ? err.message : err)}}));
           }
           if(type==='stop'){ running=false; }
         };
@@ -1600,7 +1602,10 @@
     async function startBtcHeaderMiner(){
       stopAll();
       stopBtcMode();
-      if (!state.btc.work) await pullBlockTemplate();
+
+      // Always refresh the template before starting so we do not mine stale work.
+      await pullBlockTemplate();
+
       resetCounters();
       state.difficulty = 0; // BTC mode uses network target, not local leading-zero difficulty.
       state.workerCount = Math.max(1, Math.min(16, Number($("workerCount").value || 4)));
@@ -1625,13 +1630,63 @@
         const worker = new Worker(url);
         worker.onmessage = async (event) => {
           const { type, payload } = event.data || {};
-          if (type === "btc_waiting") { state.harmonic = payload.harmonic; render(); return; }
+          if (type === "btc_worker_started") {
+            audit("btc", "btc_worker_started", {
+              workerIndex: payload.workerIndex,
+              workerCount: payload.workerCount,
+              harmonicMode: payload.harmonicMode,
+              harmonicThreshold: payload.harmonicThreshold,
+              timestamp: nowIso()
+            });
+            return;
+          }
+          if (type === "btc_worker_error") {
+            audit("btc", "btc_worker_error", {
+              error: payload.message,
+              timestamp: nowIso()
+            });
+            return;
+          }
+          if (type === "btc_waiting") {
+            state.harmonic = payload.harmonic;
+            const heartbeatNow = Date.now();
+            if (!state.btcLastHeartbeatAt || heartbeatNow - state.btcLastHeartbeatAt > 10000) {
+              state.btcLastHeartbeatAt = heartbeatNow;
+              audit("btc", "btc_harmonic_waiting", {
+                harmonic: state.harmonic || null,
+                harmonicMode: state.harmonicMode,
+                harmonicThreshold: state.harmonicThreshold,
+                height: state.btc.work?.template?.height || null,
+                timestamp: nowIso()
+              });
+            }
+            render();
+            return;
+          }
           if (type !== "btc_batch") return;
           state.harmonic = payload.harmonic || state.harmonic;
           state.hashesTotal += payload.hashes || 0;
           rates.set(i, payload.hashRate || 0);
           state.hashRateHps = [...rates.values()].reduce((a,b)=>a+b,0);
           state.lastHash = payload.lastHash || state.lastHash;
+
+          // Low-frequency heartbeat so the audit log visibly moves while mining,
+          // without filling browser localStorage on every worker batch.
+          const heartbeatNow = Date.now();
+          if (!state.btcLastHeartbeatAt || heartbeatNow - state.btcLastHeartbeatAt > 10000) {
+            state.btcLastHeartbeatAt = heartbeatNow;
+            audit("btc", "btc_hashing_heartbeat", {
+              mode: state.mode,
+              hashesTotal: state.hashesTotal,
+              hashRateHps: Math.round(state.hashRateHps || 0),
+              lastHash: state.lastHash,
+              harmonic: state.harmonic || null,
+              height: state.btc.work?.template?.height || null,
+              target: state.btc.work?.targetHex || null,
+              timestamp: nowIso()
+            });
+          }
+
           for (const f of payload.found || []){
             state.sharesFound += 1;
 
@@ -1713,6 +1768,7 @@
         hasCoinbaseBuilder: typeof buildCoinbaseTx === "function",
         hasMerkleBuilder: typeof merkleRootInternal === "function",
         hasHeaderWorker: typeof btcWorkerSource === "function",
+        hasHeartbeatAudit: true,
         hasSolvedBlockBuilder: typeof buildSolvedBlockHex === "function",
         hasSubmitBlock: typeof submitSolvedBlock === "function",
         poolUsesBtcWork: true,
