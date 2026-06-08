@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Aurora Harmonic Miner | SSHT Build</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  min-height:100vh;
+  background:radial-gradient(circle at 20% 10%,#16324a 0%,#07111e 45%,#02040a 100%);
+  color:#e8f3ff;
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  padding:24px;
+  line-height:1.5;
+}
+.wrap{max-width:1180px;margin:0 auto}
+.hero,.card{
+  background:rgba(8,15,28,.84);
+  border:1px solid rgba(74,222,128,.35);
+  border-radius:22px;
+  box-shadow:0 20px 50px rgba(0,0,0,.35);
+  backdrop-filter:blur(10px);
+}
+.hero{padding:22px;margin-bottom:18px}
+h1{font-size:clamp(1.7rem,3vw,3rem);color:#4ade80;margin-bottom:6px}
+h2{margin-bottom:10px}
+.sub,.small{color:#a9bdd6}
+.small{font-size:.78rem;margin-top:8px}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+.card{padding:18px}
+.span-4{grid-column:span 4}
+.span-8{grid-column:span 8}
+.span-12{grid-column:span 12}
+@media(max-width:860px){.span-4,.span-8{grid-column:span 12}}
+label{display:block;font-size:.78rem;color:#9fb4cc;margin-bottom:6px}
+input,select,button{
+  font:inherit;
+  border-radius:12px;
+  border:1px solid rgba(148,163,184,.3);
+  background:#060b14;
+  color:#e8f3ff;
+  padding:10px 12px;
+  width:100%;
+}
+input[readonly]{color:#8af7b2;border-color:rgba(74,222,128,.35)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+@media(max-width:640px){.row{grid-template-columns:1fr}}
+.btn-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+button{cursor:pointer;width:auto;min-width:130px;font-weight:800}
+.start{background:#4ade80;color:#06110a;border:none}
+.demo{background:#fbbf24;color:#171100;border:none}
+.stop{background:#ef4444;color:white;border:none}
+.ghost{background:#111827;color:#dbeafe}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+@media(max-width:860px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{
+  background:rgba(15,23,42,.85);
+  border:1px solid rgba(148,163,184,.18);
+  border-radius:16px;
+  padding:14px;
+}
+.stat b{display:block;color:#4ade80;font-size:1.15rem;overflow-wrap:anywhere}
+.stat span{color:#9fb4cc;font-size:.76rem}
+.log{
+  height:360px;
+  overflow:auto;
+  background:#010409;
+  border:1px solid rgba(74,222,128,.35);
+  border-radius:16px;
+  padding:12px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:.8rem;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+}
+.pill{
+  display:inline-block;
+  padding:4px 9px;
+  border-radius:999px;
+  background:rgba(74,222,128,.12);
+  border:1px solid rgba(74,222,128,.35);
+  color:#86efac;
+  font-size:.76rem;
+  margin-right:6px;
+}
+.warn{color:#fbbf24}
+</style>
+</head>
+
+<body>
+<main class="wrap">
+<section class="hero">
+  <h1>⚡ Aurora Harmonic Miner</h1>
+  <p class="sub">
+    Browser-native SSHT harmonic miner. Uses Web Workers, harmonic timing windows,
+    π / φ / Fibonacci scoring, local audit logging, private tab-pool coordination,
+    and exportable entropy records.
+  </p>
+  <p class="small">
+    <span class="pill">SSHT harmonic mode</span>
+    <span class="pill">CPU Web Workers</span>
+    <span class="pill">Private browser pool</span>
+    <span class="pill">Audit stamped</span>
+  </p>
+</section>
+
+<section class="grid">
+
+<div class="card span-4">
+  <h2>Address Layer</h2>
+  <label>Primary BTC address</label>
+  <input id="primaryAddress" readonly />
+  <label style="margin-top:12px">Fallback BTC address</label>
+  <input id="fallbackAddress" readonly />
+  <p class="small">Addresses are stamped into every found share/candidate audit record.</p>
+</div>
+
+<div class="card span-8">
+  <h2>Controls</h2>
+  <div class="row">
+    <div>
+      <label>Difficulty: leading zeroes required</label>
+      <input id="difficulty" type="number" min="1" max="8" value="4" />
+    </div>
+    <div>
+      <label>Worker count</label>
+      <input id="workerCount" type="number" min="1" max="16" value="4" />
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Mining mode</label>
+      <select id="harmonicMode">
+        <option value="continuous">continuous</option>
+        <option value="harmonic-only" selected>harmonic-only</option>
+        <option value="mixed">mixed comparison</option>
+      </select>
+    </div>
+    <div>
+      <label>Harmonic threshold, lower = stricter</label>
+      <input id="harmonicThreshold" type="number" min="0.01" max="1" step="0.01" value="0.18" />
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="start" id="startCpuBtn">▶ Start Harmonic Miner</button>
+    <button class="demo" id="startDemoBtn">◐ Demo Mode</button>
+    <button class="stop" id="stopBtn">⏹ Stop</button>
+    <button class="ghost" id="clearBtn">Clear Audit</button>
+    <button class="ghost" id="exportBtn">Export Audit JSON</button>
+  </div>
+</div>
+
+<div class="card span-12">
+  <h2>Status</h2>
+  <div class="stats">
+    <div class="stat"><b id="runningState">Idle</b><span>mode</span></div>
+    <div class="stat"><b id="hashesTotal">0</b><span>total hashes</span></div>
+    <div class="stat"><b id="hashRate">0 H/s</b><span>hash rate</span></div>
+    <div class="stat"><b id="sharesFound">0</b><span>found shares</span></div>
+  </div>
+  <div class="stats">
+    <div class="stat"><b id="harmonicScore">—</b><span>current harmonic score</span></div>
+    <div class="stat"><b id="harmonicAligned">—</b><span>alignment state</span></div>
+    <div class="stat"><b id="bestHash">—</b><span>best hash prefix</span></div>
+    <div class="stat"><b id="lastHash">—</b><span>last hash</span></div>
+  </div>
+</div>
+
+<div class="card span-12">
+  <h2>Private Browser Pool</h2>
+  <p class="small">
+    Open this same file/page in multiple tabs. Start coordinator in one tab,
+    then join as worker in other tabs. Work ranges are non-overlapping.
+  </p>
+  <div class="row">
+    <div>
+      <label>Pool ID</label>
+      <input id="poolId" value="aurora-harmonic-private-pool" />
+    </div>
+    <div>
+      <label>Nonce range size per job</label>
+      <input id="poolRangeSize" type="number" min="1000" max="50000000" value="250000" />
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="start" id="poolStartCoordinatorBtn">▶ Start Pool Coordinator</button>
+    <button class="ghost" id="poolJoinWorkerBtn">Join This Tab as Worker</button>
+    <button class="stop" id="poolStopBtn">⏹ Stop Pool</button>
+  </div>
+  <div class="stats">
+    <div class="stat"><b id="poolState">Idle</b><span>pool state</span></div>
+    <div class="stat"><b id="poolWorkers">0</b><span>workers</span></div>
+    <div class="stat"><b id="poolJobs">0</b><span>assigned jobs</span></div>
+    <div class="stat"><b id="poolBest">—</b><span>pool best prefix</span></div>
+  </div>
+</div>
+
+<div class="card span-12">
+  <h2>Audit Log</h2>
+  <div class="log" id="auditLog"></div>
+</div>
+
+</section>
+</main>
+
+<script>
+const PAYOUT_BTC_ADDRESS = "bc1q8k6jzlfyqs067t4szl6rgawpn0dth4xjt60eef";
+const FALLBACK_BTC_ADDRESS = "bc1q29yw3hsemexhd3cdpkzdmxg4hhrgwgaj6n8rmv";
+const STORAGE_KEY = "aurora_harmonic_miner_state_v1";
+
+const state = {
+  running:false,
+  mode:"idle",
+  workers:[],
+  demoTimer:null,
+  difficulty:4,
+  workerCount:4,
+  harmonicMode:"harmonic-only",
+  harmonicThreshold:0.18,
+  hashesTotal:0,
+  hashRateHps:0,
+  sharesFound:0,
+  lastHash:null,
+  bestHash:null,
+  bestNumeric:null,
+  harmonic:null,
+  audit:[],
+  pool:{
+    channel:null,
+    channelName:"aurora-harmonic-private-pool",
+    isCoordinator:false,
+    isWorker:false,
+    workerId:null,
+    workers:{},
+    nextNonce:0,
+    rangeSize:250000,
+    assignedJobs:0,
+    localPoolWorker:null,
+    bestHash:null
+  }
+};
+
+const $ = id => document.getElementById(id);
+function nowIso(){return new Date().toISOString();}
+function formatNum(n){return Number(n || 0).toLocaleString("en-GB");}
+function formatRate(n){return `${formatNum(Math.round(n || 0))} H/s`;}
+
+// ---------------------- HARMONIC CORE ----------------------
+
+function harmonicScoreAt(ms){
+  const t = ms / 1000;
+  const phi = (1 + Math.sqrt(5)) / 2;
+
+  const piPhase = Math.abs(Math.sin(t / Math.PI));
+  const phiPhase = Math.abs(Math.sin(t / phi));
+  const fib13Phase = Math.abs(Math.sin(t / 13));
+  const fib21Phase = Math.abs(Math.sin(t / 21));
+
+  const score = (piPhase + phiPhase + fib13Phase + fib21Phase) / 4;
+  const threshold = Number($("harmonicThreshold")?.value || state.harmonicThreshold || 0.18);
+
+  return {
+    timestamp: new Date(ms).toISOString(),
+    piPhase,
+    phiPhase,
+    fib13Phase,
+    fib21Phase,
+    score,
+    threshold,
+    aligned: score <= threshold
+  };
+}
+
+function harmonicScore(){
+  return harmonicScoreAt(Date.now());
+}
+
+// ---------------------- STORAGE / RENDER ----------------------
+
+function saveState(){
+  const safe = {
+    running:state.running,
+    mode:state.mode,
+    difficulty:state.difficulty,
+    workerCount:state.workerCount,
+    harmonicMode:state.harmonicMode,
+    harmonicThreshold:state.harmonicThreshold,
+    hashesTotal:state.hashesTotal,
+    sharesFound:state.sharesFound,
+    lastHash:state.lastHash,
+    bestHash:state.bestHash,
+    bestNumeric:state.bestNumeric,
+    harmonic:state.harmonic,
+    audit:state.audit.slice(0,160),
+    pool:{
+      channelName:state.pool.channelName,
+      workers:state.pool.workers,
+      nextNonce:state.pool.nextNonce,
+      rangeSize:state.pool.rangeSize,
+      assignedJobs:state.pool.assignedJobs,
+      bestHash:state.pool.bestHash
+    }
+  };
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(safe));}catch{}
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw)return;
+    const saved = JSON.parse(raw);
+    Object.assign(state,{
+      difficulty:saved.difficulty || 4,
+      workerCount:saved.workerCount || 4,
+      harmonicMode:saved.harmonicMode || "harmonic-only",
+      harmonicThreshold:saved.harmonicThreshold || 0.18,
+      hashesTotal:saved.hashesTotal || 0,
+      sharesFound:saved.sharesFound || 0,
+      lastHash:saved.lastHash || null,
+      bestHash:saved.bestHash || null,
+      bestNumeric:saved.bestNumeric || null,
+      harmonic:saved.harmonic || null,
+      audit:Array.isArray(saved.audit) ? saved.audit : []
+    });
+    if(saved.pool) Object.assign(state.pool,saved.pool);
+  }catch{}
+}
+
+function audit(scope,event,payload={}){
+  const record = {scope,event,at:nowIso(),...payload};
+  state.audit.unshift(record);
+  state.audit = state.audit.slice(0,160);
+  saveState();
+  renderLog();
+}
+
+function render(){
+  $("primaryAddress").value = PAYOUT_BTC_ADDRESS;
+  $("fallbackAddress").value = FALLBACK_BTC_ADDRESS;
+  $("difficulty").value = state.difficulty;
+  $("workerCount").value = state.workerCount;
+  $("harmonicMode").value = state.harmonicMode;
+  $("harmonicThreshold").value = state.harmonicThreshold;
+
+  const h = harmonicScore();
+  state.harmonic = h;
+
+  $("runningState").textContent = state.running ? state.mode : "Idle";
+  $("hashesTotal").textContent = formatNum(state.hashesTotal);
+  $("hashRate").textContent = formatRate(state.hashRateHps);
+  $("sharesFound").textContent = formatNum(state.sharesFound);
+  $("lastHash").textContent = state.lastHash || "—";
+  $("bestHash").textContent = state.bestHash ? state.bestHash.slice(0,18) + "…" : "—";
+  $("harmonicScore").textContent = h.score.toFixed(5);
+  $("harmonicAligned").textContent = h.aligned ? "Aligned" : "Waiting";
+  $("poolState").textContent = state.pool.isCoordinator && state.pool.isWorker ? "Coordinator + Worker" : state.pool.isCoordinator ? "Coordinator" : state.pool.isWorker ? "Worker" : "Idle";
+  $("poolWorkers").textContent = Object.keys(state.pool.workers || {}).length;
+  $("poolJobs").textContent = formatNum(state.pool.assignedJobs || 0);
+  $("poolBest").textContent = state.pool.bestHash ? state.pool.bestHash.slice(0,18) + "…" : "—";
+
+  renderLog();
+}
+
+function renderLog(){
+  $("auditLog").textContent = state.audit.map(r=>JSON.stringify(r)).join("\n");
+}
+
+function resetCounters(){
+  state.hashesTotal=0;
+  state.hashRateHps=0;
+  state.sharesFound=0;
+  state.lastHash=null;
+  state.bestHash=null;
+  state.bestNumeric=null;
+  saveState();
+  render();
+}
+
+// ---------------------- WORKER SOURCES ----------------------
+
+function cpuWorkerSource(){
+return `
+let running=false;
+let difficulty=4;
+let harmonicMode="harmonic-only";
+let harmonicThreshold=.18;
+
+function hex(buffer){return [...new Uint8Array(buffer)].map(b=>b.toString(16).padStart(2,"0")).join("");}
+async function sha256(text){return await crypto.subtle.digest("SHA-256",new TextEncoder().encode(text));}
+
+function harmonicScore(){
+  const ms = Date.now();
+  const t = ms / 1000;
+  const phi = (1 + Math.sqrt(5)) / 2;
+  const piPhase = Math.abs(Math.sin(t / Math.PI));
+  const phiPhase = Math.abs(Math.sin(t / phi));
+  const fib13Phase = Math.abs(Math.sin(t / 13));
+  const fib21Phase = Math.abs(Math.sin(t / 21));
+  const score = (piPhase + phiPhase + fib13Phase + fib21Phase) / 4;
+  return {
+    timestamp:new Date(ms).toISOString(),
+    piPhase,phiPhase,fib13Phase,fib21Phase,
+    score,
+    threshold:harmonicThreshold,
+    aligned:score <= harmonicThreshold
+  };
+}
+
+function shouldHash(h){
+  if(harmonicMode === "continuous") return true;
+  if(harmonicMode === "harmonic-only") return h.aligned;
+  if(harmonicMode === "mixed") return true;
+  return true;
+}
+
+async function loop(){
+  while(running){
+    const batchHarmonic = harmonicScore();
+
+    if(!shouldHash(batchHarmonic)){
+      postMessage({type:"waiting",payload:{harmonic:batchHarmonic}});
+      await new Promise(r=>setTimeout(r,50));
+      continue;
+    }
+
+    const start=performance.now();
+    let hashes=0,shares=0,lastHash=null,bestHash=null,bestNumeric=null;
+    const found=[];
+    const prefix="0".repeat(difficulty);
+
+    for(let i=0;i<1200;i++){
+      const seed = "aurora-harmonic|" + Date.now() + "|" + Math.random() + "|" + i + "|" + batchHarmonic.score;
+      const h1 = await sha256(seed);
+      const h2 = await sha256(hex(h1));
+      const digest = hex(h2);
+      lastHash = digest;
+      hashes++;
+
+      const numericPrefix = BigInt("0x" + digest.slice(0,16));
+      if(bestNumeric === null || numericPrefix < bestNumeric){
+        bestNumeric = numericPrefix;
+        bestHash = digest;
+      }
+
+      if(digest.startsWith(prefix)){
+        shares++;
+        found.push({digest,harmonic:batchHarmonic,mode:harmonicMode});
+      }
+    }
+
+    const elapsed=Math.max((performance.now()-start)/1000,.0001);
+    postMessage({type:"batch",payload:{hashes,shares,found,lastHash,bestHash,bestNumeric:String(bestNumeric),hashRate:hashes/elapsed,harmonic:batchHarmonic}});
+    await new Promise(r=>setTimeout(r,0));
+  }
+}
+
+onmessage=(event)=>{
+  const {type,payload}=event.data||{};
+  if(type==="start"){
+    difficulty=payload.difficulty||4;
+    harmonicMode=payload.harmonicMode||"harmonic-only";
+    harmonicThreshold=payload.harmonicThreshold||.18;
+    running=true;
+    loop();
+  }
+  if(type==="stop") running=false;
+};
+`;
+}
+
+function poolWorkerSource(){
+return `
+let running=false;
+
+function hex(buffer){return [...new Uint8Array(buffer)].map(b=>b.toString(16).padStart(2,"0")).join("");}
+async function sha256(text){return await crypto.subtle.digest("SHA-256",new TextEncoder().encode(text));}
+
+function harmonicScore(threshold){
+  const ms = Date.now();
+  const t = ms / 1000;
+  const phi = (1 + Math.sqrt(5)) / 2;
+  const piPhase = Math.abs(Math.sin(t / Math.PI));
+  const phiPhase = Math.abs(Math.sin(t / phi));
+  const fib13Phase = Math.abs(Math.sin(t / 13));
+  const fib21Phase = Math.abs(Math.sin(t / 21));
+  const score = (piPhase + phiPhase + fib13Phase + fib21Phase) / 4;
+  return {timestamp:new Date(ms).toISOString(),piPhase,phiPhase,fib13Phase,fib21Phase,score,threshold,aligned:score<=threshold};
+}
+
+async function runJob(job){
+  running=true;
+  const start=performance.now();
+  let hashes=0,found=[],lastHash=null,bestHash=null,bestNumeric=null;
+  const prefix="0".repeat(job.localDifficulty||4);
+
+  for(let offset=0; running && offset<job.count; offset++){
+    const hs = harmonicScore(job.harmonicThreshold || .18);
+
+    if(job.harmonicMode === "harmonic-only" && !hs.aligned){
+      await new Promise(r=>setTimeout(r,25));
+      continue;
+    }
+
+    const nonce=(job.startNonce+offset)>>>0;
+    const seed="aurora-harmonic-pool|" + job.jobId + "|" + nonce + "|" + job.payoutAddress + "|" + hs.score;
+    const h1=await sha256(seed);
+    const h2=await sha256(hex(h1));
+    const digest=hex(h2);
+    lastHash=digest;
+    hashes++;
+
+    const numericPrefix=BigInt("0x"+digest.slice(0,16));
+    if(bestNumeric===null || numericPrefix<bestNumeric){
+      bestNumeric=numericPrefix;
+      bestHash=digest;
+    }
+
+    if(digest.startsWith(prefix)) found.push({nonce,digest,harmonic:hs});
+    if(offset%1000===0) await new Promise(r=>setTimeout(r,0));
+  }
+
+  const elapsed=Math.max((performance.now()-start)/1000,.0001);
+  postMessage({type:"worker_report",payload:{jobId:job.jobId,hashes,found,lastHash,bestHash,bestNumeric:String(bestNumeric),hashRate:hashes/elapsed,done:true}});
+}
+
+onmessage=(event)=>{
+  const {type,payload}=event.data||{};
+  if(type==="start_job") runJob(payload.job);
+  if(type==="stop") running=false;
+};
+`;
+}
+
+// ---------------------- CPU MINING ----------------------
+
+function stopCpuMode(){
+  for(const worker of state.workers){
+    worker.postMessage({type:"stop"});
+    worker.terminate();
+  }
+  state.workers=[];
+}
+
+function startCpuMode(){
+  stopAll();
+  resetCounters();
+
+  state.difficulty=Math.max(1,Math.min(8,Number($("difficulty").value||4)));
+  state.workerCount=Math.max(1,Math.min(16,Number($("workerCount").value||4)));
+  state.harmonicMode=$("harmonicMode").value;
+  state.harmonicThreshold=Number($("harmonicThreshold").value||.18);
+  state.running=true;
+  state.mode="harmonic-cpu";
+
+  audit("miner","harmonic_cpu_start",{
+    difficulty:state.difficulty,
+    workers:state.workerCount,
+    harmonicMode:state.harmonicMode,
+    harmonicThreshold:state.harmonicThreshold,
+    payoutAddress:PAYOUT_BTC_ADDRESS,
+    fallbackAddress:FALLBACK_BTC_ADDRESS
+  });
+
+  const blob=new Blob([cpuWorkerSource()],{type:"application/javascript"});
+  const url=URL.createObjectURL(blob);
+  const rates=new Map();
+
+  for(let i=0;i<state.workerCount;i++){
+    const worker=new Worker(url);
+    worker.onmessage=(event)=>{
+      const {type,payload}=event.data||{};
+
+      if(type==="waiting"){
+        state.harmonic=payload.harmonic;
+        render();
+        return;
+      }
+
+      if(type!=="batch") return;
+
+      state.hashesTotal += payload.hashes || 0;
+      rates.set(i,payload.hashRate||0);
+      state.hashRateHps=[...rates.values()].reduce((a,b)=>a+b,0);
+      state.lastHash=payload.lastHash||state.lastHash;
+      state.harmonic=payload.harmonic;
+
+      if(payload.bestHash && (!state.bestNumeric || BigInt(payload.bestNumeric) < BigInt(state.bestNumeric))){
+        state.bestHash=payload.bestHash;
+        state.bestNumeric=payload.bestNumeric;
+      }
+
+      for(const found of payload.found||[]){
+        state.sharesFound++;
+        audit("miner","harmonic_share_found",{
+          digest:found.digest,
+          harmonic:found.harmonic,
+          mode:found.mode,
+          payoutAddress:PAYOUT_BTC_ADDRESS,
+          fallbackAddress:FALLBACK_BTC_ADDRESS,
+          difficulty:state.difficulty,
+          workerIndex:i,
+          timestamp:nowIso()
+        });
+      }
+
+      saveState();
+      render();
+    };
+
+    worker.postMessage({
+      type:"start",
+      payload:{
+        difficulty:state.difficulty,
+        harmonicMode:state.harmonicMode,
+        harmonicThreshold:state.harmonicThreshold
+      }
+    });
+
+    state.workers.push(worker);
+  }
+
+  render();
+}
+
+// ---------------------- DEMO ----------------------
+
+function startDemoMode(){
+  stopAll();
+  resetCounters();
+  state.running=true;
+  state.mode="demo-harmonic";
+  state.difficulty=Number($("difficulty").value||4);
+
+  audit("miner","demo_harmonic_start",{difficulty:state.difficulty});
+
+  state.demoTimer=setInterval(()=>{
+    const hs=harmonicScore();
+    const hashes=2500+Math.floor(Math.random()*1800);
+    state.hashesTotal += hashes;
+    state.hashRateHps = hashes;
+    const digest=Math.random().toString(16).slice(2).padEnd(64,"0").slice(0,64);
+    state.lastHash=digest;
+    state.harmonic=hs;
+
+    if(hs.aligned && digest.startsWith("0".repeat(Math.min(state.difficulty,3)))){
+      state.sharesFound++;
+      audit("miner","demo_harmonic_share_found",{
+        digest,
+        harmonic:hs,
+        payoutAddress:PAYOUT_BTC_ADDRESS,
+        fallbackAddress:FALLBACK_BTC_ADDRESS
+      });
+    }
+
+    saveState();
+    render();
+  },1000);
+
+  render();
+}
+
+// ---------------------- POOL ----------------------
+
+function poolWorkerId(){
+  let id=sessionStorage.getItem("aurora_harmonic_pool_worker_id");
+  if(!id){
+    id="worker-"+Math.random().toString(16).slice(2)+"-"+Date.now();
+    sessionStorage.setItem("aurora_harmonic_pool_worker_id",id);
+  }
+  return id;
+}
+
+function poolChannelName(){
+  return ($("poolId")?.value || "aurora-harmonic-private-pool").trim();
+}
+
+function ensurePoolChannel(){
+  const name=poolChannelName();
+  if(state.pool.channel && state.pool.channelName===name) return state.pool.channel;
+  if(state.pool.channel) state.pool.channel.close();
+  state.pool.channelName=name;
+  state.pool.channel=new BroadcastChannel(name);
+  state.pool.channel.onmessage=onPoolMessage;
+  return state.pool.channel;
+}
+
+function poolPost(type,payload={}){
+  ensurePoolChannel().postMessage({type,payload,at:nowIso(),from:state.pool.workerId||"coordinator"});
+}
+
+function startPoolCoordinator(){
+  ensurePoolChannel();
+  state.pool.isCoordinator=true;
+  state.pool.workers={};
+  state.pool.nextNonce=0;
+  state.pool.rangeSize=Math.max(1000,Number($("poolRangeSize").value||250000));
+  state.pool.assignedJobs=0;
+
+  audit("pool","harmonic_coordinator_started",{
+    poolId:state.pool.channelName,
+    rangeSize:state.pool.rangeSize,
+    harmonicMode:$("harmonicMode").value,
+    harmonicThreshold:Number($("harmonicThreshold").value||.18)
+  });
+
+  poolPost("coordinator_online",{});
+  render();
+}
+
+function joinPoolAsWorker(){
+  ensurePoolChannel();
+  state.pool.isWorker=true;
+  state.pool.workerId=poolWorkerId();
+
+  const registration={type:"worker_register",payload:{workerId:state.pool.workerId,joinedAt:nowIso()}};
+
+  audit("pool","worker_join_requested",{workerId:state.pool.workerId});
+
+  if(state.pool.isCoordinator) onPoolMessage({data:registration});
+  else poolPost("worker_register",registration.payload);
+
+  render();
+}
+
+function assignPoolJob(workerId){
+  const startNonce=state.pool.nextNonce>>>0;
+  const count=Math.max(1000,Number(state.pool.rangeSize||250000));
+  state.pool.nextNonce=(state.pool.nextNonce+count)>>>0;
+  state.pool.assignedJobs++;
+
+  const job={
+    jobId:"job-"+state.pool.assignedJobs+"-"+Date.now(),
+    startNonce,
+    count,
+    localDifficulty:Math.max(1,Math.min(8,Number($("difficulty").value||4))),
+    harmonicMode:$("harmonicMode").value,
+    harmonicThreshold:Number($("harmonicThreshold").value||.18),
+    payoutAddress:PAYOUT_BTC_ADDRESS,
+    fallbackAddress:FALLBACK_BTC_ADDRESS
+  };
+
+  poolPost("job_assign",{workerId,job});
+
+  if(state.pool.isWorker && state.pool.workerId===workerId){
+    startPoolLocalJob(job);
+  }
+
+  audit("pool","harmonic_job_assigned",{workerId,jobId:job.jobId,startNonce,count});
+  render();
+}
+
+function onPoolMessage(event){
+  const msg=event.data||{};
+  const type=msg.type;
+  const payload=msg.payload||{};
+
+  if(state.pool.isCoordinator){
+    if(type==="worker_register"){
+      state.pool.workers[payload.workerId]={workerId:payload.workerId,joinedAt:payload.joinedAt,lastSeen:nowIso(),hashRate:0};
+      audit("pool","worker_registered",{workerId:payload.workerId});
+      assignPoolJob(payload.workerId);
+    }
+
+    if(type==="worker_report"){
+      const w=state.pool.workers[payload.workerId] || {workerId:payload.workerId};
+      w.lastSeen=nowIso();
+      w.hashRate=payload.hashRate||0;
+      w.hashes=(w.hashes||0)+(payload.hashes||0);
+      state.pool.workers[payload.workerId]=w;
+
+      state.hashesTotal += payload.hashes||0;
+      state.hashRateHps=Object.values(state.pool.workers).reduce((a,b)=>a+(b.hashRate||0),0);
+      state.lastHash=payload.lastHash||state.lastHash;
+
+      if(payload.bestHash){
+        state.pool.bestHash=payload.bestHash;
+        if(!state.bestNumeric || BigInt(payload.bestNumeric)<BigInt(state.bestNumeric)){
+          state.bestHash=payload.bestHash;
+          state.bestNumeric=payload.bestNumeric;
+        }
+      }
+
+      for(const found of payload.found||[]){
+        state.sharesFound++;
+        audit("pool","harmonic_pool_candidate_found",{
+          workerId:payload.workerId,
+          jobId:payload.jobId,
+          digest:found.digest,
+          nonce:found.nonce,
+          harmonic:found.harmonic,
+          payoutAddress:PAYOUT_BTC_ADDRESS,
+          fallbackAddress:FALLBACK_BTC_ADDRESS
+        });
+      }
+
+      if(payload.done) assignPoolJob(payload.workerId);
+      saveState();
+      render();
+    }
+  }
+
+  if(state.pool.isWorker){
+    if(type==="pool_stop") stopPool();
+    if(type==="job_assign" && payload.workerId===state.pool.workerId) startPoolLocalJob(payload.job);
+  }
+}
+
+function startPoolLocalJob(job){
+  if(state.pool.localPoolWorker){
+    state.pool.localPoolWorker.postMessage({type:"stop"});
+    state.pool.localPoolWorker.terminate();
+  }
+
+  audit("pool","worker_job_started",{workerId:state.pool.workerId,jobId:job.jobId});
+
+  const blob=new Blob([poolWorkerSource()],{type:"application/javascript"});
+  const url=URL.createObjectURL(blob);
+  const worker=new Worker(url);
+  state.pool.localPoolWorker=worker;
+
+  worker.onmessage=(event)=>{
+    const {type,payload}=event.data||{};
+    if(type!=="worker_report") return;
+
+    const report={
+      type:"worker_report",
+      payload:{workerId:state.pool.workerId,...payload},
+      at:nowIso(),
+      from:state.pool.workerId
+    };
+
+    if(state.pool.isCoordinator) onPoolMessage({data:report});
+    else poolPost("worker_report",report.payload);
+
+    audit("pool","worker_job_completed",{
+      workerId:state.pool.workerId,
+      jobId:payload.jobId,
+      hashes:payload.hashes,
+      foundCount:(payload.found||[]).length
+    });
+  };
+
+  worker.postMessage({type:"start_job",payload:{job}});
+}
+
+function stopPool(){
+  if(state.pool.localPoolWorker){
+    state.pool.localPoolWorker.postMessage({type:"stop"});
+    state.pool.localPoolWorker.terminate();
+    state.pool.localPoolWorker=null;
+  }
+  poolPost("pool_stop",{});
+  state.pool.isCoordinator=false;
+  state.pool.isWorker=false;
+  state.pool.workers={};
+  state.pool.assignedJobs=0;
+  audit("pool","pool_stopped",{});
+  render();
+}
+
+// ---------------------- STOP / EXPORT ----------------------
+
+function stopAll(){
+  if(state.demoTimer){
+    clearInterval(state.demoTimer);
+    state.demoTimer=null;
+  }
+  stopCpuMode();
+  if(state.running) audit("miner","stop",{timestamp:nowIso()});
+  state.running=false;
+  state.mode="idle";
+  state.hashRateHps=0;
+  saveState();
+  render();
+}
+
+function exportAudit(){
+  const payload={
+    exportedAt:nowIso(),
+    payoutAddress:PAYOUT_BTC_ADDRESS,
+    fallbackAddress:FALLBACK_BTC_ADDRESS,
+    status:{
+      mode:state.mode,
+      hashesTotal:state.hashesTotal,
+      hashRateHps:state.hashRateHps,
+      sharesFound:state.sharesFound,
+      lastHash:state.lastHash,
+      bestHash:state.bestHash,
+      bestNumeric:state.bestNumeric,
+      harmonic:state.harmonic
+    },
+    audit:state.audit
+  };
+
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=`aurora-harmonic-audit-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ---------------------- EVENTS ----------------------
+
+$("startCpuBtn").addEventListener("click",startCpuMode);
+$("startDemoBtn").addEventListener("click",startDemoMode);
+$("stopBtn").addEventListener("click",stopAll);
+$("clearBtn").addEventListener("click",()=>{state.audit=[];saveState();renderLog();});
+$("exportBtn").addEventListener("click",exportAudit);
+$("poolStartCoordinatorBtn").addEventListener("click",startPoolCoordinator);
+$("poolJoinWorkerBtn").addEventListener("click",joinPoolAsWorker);
+$("poolStopBtn").addEventListener("click",stopPool);
+
+setInterval(render,1000);
+
+loadState();
+render();
+audit("system","aurora_harmonic_loaded",{timestamp:nowIso()});
+</script>
+</body>
+</html>
