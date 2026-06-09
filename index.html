@@ -77,6 +77,15 @@
     @media (max-width: 860px) { .pool-grid { grid-template-columns: 1fr; } }
     .pool-note { border-left: 3px solid #4ade80; padding-left: 10px; }
 
+
+    .alert-panel{position:fixed;right:18px;bottom:18px;z-index:9999;width:min(420px,calc(100vw - 36px));background:rgba(2,6,14,.94);border:1px solid rgba(74,222,128,.45);border-radius:18px;box-shadow:0 18px 60px rgba(0,0,0,.55);padding:14px;display:none}
+    .alert-panel.show{display:block}.alert-title{font-weight:900;color:#86efac;margin-bottom:4px}.alert-body{color:#dbeafe;font-size:.88rem}.alert-close{float:right;min-width:auto;width:auto;padding:4px 9px;font-size:.78rem}
+    .screen-flash{position:fixed;inset:0;z-index:9998;pointer-events:none;opacity:0;transition:opacity .35s ease;border:8px solid rgba(74,222,128,.9);box-shadow:inset 0 0 90px rgba(74,222,128,.35)}
+    .screen-flash.active{opacity:1}
+    .neo-overlay{position:fixed;inset:0;z-index:9997;pointer-events:none;display:none;align-items:center;justify-content:center;text-align:center;background:linear-gradient(rgba(0,255,90,.08),rgba(0,0,0,.88)),repeating-linear-gradient(90deg,rgba(0,255,90,.08) 0 1px,transparent 1px 8px);color:#86efac;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-shadow:0 0 16px rgba(74,222,128,.9)}
+    .neo-overlay.show{display:flex}.neo-card{border:1px solid rgba(74,222,128,.55);border-radius:22px;padding:28px;background:rgba(0,0,0,.62);max-width:760px}.neo-card h2{font-size:clamp(1.7rem,4vw,3rem);margin-bottom:8px}
+    .hof-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:.82rem}.hof-table th,.hof-table td{border-bottom:1px solid rgba(148,163,184,.18);padding:6px;text-align:left}.hof-table td{overflow-wrap:anywhere}
+
   </style>
 </head>
 <body>
@@ -230,6 +239,29 @@
         <h2>Audit Log</h2>
         <div class="log" id="auditLog"></div>
       </div>
+
+      <div class="card span-12">
+        <h2>🔔 Neo Alert Control Nest</h2>
+        <div class="row">
+          <div><label>Alerts</label><select id="alertEnabled"><option value="on" selected>on</option><option value="off">off</option></select></div>
+          <div><label>Voice alerts</label><select id="voiceEnabled"><option value="on" selected>on</option><option value="off">off</option></select></div>
+        </div>
+        <div class="row">
+          <div><label>Sound alerts</label><select id="soundEnabled"><option value="on" selected>on</option><option value="off">off</option></select></div>
+          <div><label>Neo highlight threshold: leading zeroes</label><input id="neoZeroThreshold" type="number" min="4" max="18" value="6" /></div>
+        </div>
+        <div class="btn-row">
+          <button class="ghost" id="testAlertBtn">Test Alert</button>
+          <button class="ghost" id="enableBrowserNotifyBtn">Enable Browser Notifications</button>
+          <button class="ghost" id="clearHallBtn">Clear Hall of Fame</button>
+        </div>
+        <p class="small">Alerts fire for worker start, harmonic window changes, strong hashes, network target hits, submitblock results, and worker errors.</p>
+      </div>
+      <div class="card span-12">
+        <h2>🏆 Hall of Fame — Best Hashes</h2>
+        <div id="hallOfFame"></div>
+      </div>
+
     </section>
   </main>
 
@@ -250,6 +282,11 @@
       sharesFound: 0,
       lastHash: null,
       btcLastHeartbeatAt: 0,
+      lastAlignmentState: null,
+      bestLeadingZeros: 0,
+      bestHashEver: null,
+      hallOfFame: [],
+      alertConfig: { enabled: true, voice: true, sound: true, browser: false, neoZeroThreshold: 6 },
       harmonic: null,
       harmonicMode: "harmonic-only",
       harmonicThreshold: 0.65,
@@ -310,6 +347,85 @@
       return true;
     }
 
+    function leadingZeroCount(hash){
+      const h = String(hash || "").toLowerCase(); let n = 0;
+      for (const ch of h){ if (ch === "0") n++; else break; }
+      return n;
+    }
+    function getAlertConfig(){
+      const enabled = $("alertEnabled") ? $("alertEnabled").value === "on" : state.alertConfig.enabled;
+      const voice = $("voiceEnabled") ? $("voiceEnabled").value === "on" : state.alertConfig.voice;
+      const sound = $("soundEnabled") ? $("soundEnabled").value === "on" : state.alertConfig.sound;
+      const neoZeroThreshold = Math.max(4, Math.min(18, Number($("neoZeroThreshold")?.value || state.alertConfig.neoZeroThreshold || 6)));
+      state.alertConfig = { ...state.alertConfig, enabled, voice, sound, neoZeroThreshold };
+      return state.alertConfig;
+    }
+    function playTone(kind="info"){
+      const cfg = getAlertConfig(); if (!cfg.enabled || !cfg.sound) return;
+      try{
+        const Ctx = window.AudioContext || window.webkitAudioContext; if(!Ctx) return;
+        const ctx = new Ctx(), osc = ctx.createOscillator(), gain = ctx.createGain();
+        const map = {info:[660,.12],share:[880,.16],strong:[440,.18],neo:[220,.35],danger:[110,.55],success:[990,.28],error:[160,.4]};
+        const [freq,dur] = map[kind] || map.info;
+        osc.frequency.value = freq; osc.type = kind === "danger" ? "sawtooth" : "sine";
+        gain.gain.setValueAtTime(.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(.18, ctx.currentTime+.02);
+        gain.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime+dur);
+        osc.connect(gain); gain.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime+dur+.03);
+        setTimeout(()=>ctx.close().catch(()=>{}),(dur+.2)*1000);
+      }catch{}
+    }
+    function speakAlert(text){
+      const cfg = getAlertConfig(); if (!cfg.enabled || !cfg.voice) return;
+      try{ if(!("speechSynthesis" in window)) return; const u = new SpeechSynthesisUtterance(text); u.rate=.95; u.pitch=.9; speechSynthesis.speak(u); }catch{}
+    }
+    function browserNotify(title, body){
+      const cfg = getAlertConfig(); if (!cfg.enabled || !cfg.browser) return;
+      try{ if(("Notification" in window) && Notification.permission === "granted") new Notification(title,{body}); }catch{}
+    }
+    function flashScreen(kind="info"){
+      const cfg=getAlertConfig(); if(!cfg.enabled) return; const el=$("screenFlash"); if(!el) return;
+      const colors={info:"rgba(96,165,250,.9)",share:"rgba(74,222,128,.9)",strong:"rgba(251,191,36,.95)",neo:"rgba(34,197,94,.95)",danger:"rgba(239,68,68,.95)",success:"rgba(167,139,250,.95)",error:"rgba(251,113,133,.95)"};
+      const c = colors[kind] || colors.info; el.style.borderColor=c; el.style.boxShadow=`inset 0 0 100px ${c}`; el.classList.add("active"); setTimeout(()=>el.classList.remove("active"),kind==="danger"?1600:500);
+    }
+    function showNeo(title,message,ms=3500){
+      const cfg=getAlertConfig(); if(!cfg.enabled) return; const o=$("neoOverlay"); if(!o) return;
+      $("neoTitle").textContent=title; $("neoMessage").textContent=message; o.classList.add("show"); setTimeout(()=>o.classList.remove("show"),ms);
+    }
+    function showAlert(title, body, kind="info", opts={}){
+      const cfg=getAlertConfig(); if(!cfg.enabled) return;
+      const p=$("alertPanel"); if(p){ $("alertTitle").textContent=title; $("alertBody").textContent=body; p.classList.add("show"); clearTimeout(window.__auroraAlertTimer); window.__auroraAlertTimer=setTimeout(()=>p.classList.remove("show"), opts.sticky?12000:5000); }
+      flashScreen(kind); playTone(kind); if(opts.voice) speakAlert(opts.voice); if(opts.browser) browserNotify(title, body);
+      if(kind==="neo" || kind==="danger") showNeo(title, body, kind==="danger"?9000:4200);
+    }
+    function addHallOfFame(hash, meta={}){
+      const zeros=leadingZeroCount(hash); if(!hash) return; if(zeros<4 && !meta.force) return;
+      const entry={at:nowIso(),hash,zeros,source:meta.source||state.mode||"unknown",nonce:meta.nonce??null,height:meta.height??state.btc?.work?.template?.height??null,harmonic:meta.harmonic||state.harmonic||null};
+      state.hallOfFame.unshift(entry);
+      state.hallOfFame=state.hallOfFame.sort((a,b)=>(b.zeros-a.zeros)||String(a.at).localeCompare(String(b.at))).slice(0,25);
+      if(zeros>state.bestLeadingZeros){
+        state.bestLeadingZeros=zeros; state.bestHashEver=hash; audit("hall","new_best_hash",entry);
+        showAlert("New Best Hash",`${zeros} leading zeroes: ${hash.slice(0,32)}...`, zeros>=getAlertConfig().neoZeroThreshold?"neo":"strong",{voice:`New best hash. ${zeros} leading zeroes.`,browser:zeros>=getAlertConfig().neoZeroThreshold});
+      } else if(zeros>=getAlertConfig().neoZeroThreshold){
+        showAlert("Neo Highlight",`${zeros} leading zeroes: ${hash.slice(0,32)}...`,"neo",{voice:`Neo highlight. ${zeros} leading zeroes.`,browser:true});
+      }
+      renderHallOfFame();
+    }
+    function renderHallOfFame(){
+      const el=$("hallOfFame"); if(!el) return;
+      const rows=(state.hallOfFame||[]).slice(0,10).map(x=>`<tr><td>${x.zeros}</td><td>${x.source||""}</td><td>${x.height??""}</td><td>${String(x.hash||"").slice(0,34)}...</td><td>${x.harmonic?Number(x.harmonic.score||0).toFixed(5):"—"}</td></tr>`).join("");
+      el.innerHTML=`<table class="hof-table"><thead><tr><th>0s</th><th>source</th><th>height</th><th>hash</th><th>score</th></tr></thead><tbody>${rows||'<tr><td colspan="5">No best hashes yet.</td></tr>'}</tbody></table>`;
+    }
+    function checkAlignmentAlert(h){
+      if(!h) return; const aligned=!!h.aligned;
+      if(state.lastAlignmentState===null){ state.lastAlignmentState=aligned; return; }
+      if(state.lastAlignmentState!==aligned){
+        state.lastAlignmentState=aligned;
+        if(aligned){ audit("harmonic","alignment_window_open",{harmonic:h,timestamp:nowIso()}); showAlert("Harmonic Window Active",`Score ${Number(h.score).toFixed(5)} <= threshold ${h.threshold}`,"info",{voice:"Harmonic window active."}); }
+        else { audit("harmonic","alignment_window_closed",{harmonic:h,timestamp:nowIso()}); }
+      }
+    }
+
     function saveState(){
       // Keep localStorage small. Large BTC templates/transactions exceed browser quota.
       const safe = {
@@ -323,6 +439,10 @@
         lastHash: state.lastHash,
         updatedAt: state.updatedAt,
         audit: (state.audit || []).slice(0, 120),
+        hallOfFame: (state.hallOfFame || []).slice(0, 25),
+        bestLeadingZeros: state.bestLeadingZeros || 0,
+        bestHashEver: state.bestHashEver || null,
+        alertConfig: state.alertConfig,
         btc: {
           rpcUrl: state.btc.rpcUrl,
           rpcUser: state.btc.rpcUser,
@@ -378,6 +498,10 @@
         state.sharesFound = saved.sharesFound || 0;
         state.lastHash = saved.lastHash || null;
         state.updatedAt = saved.updatedAt || null;
+        state.hallOfFame = Array.isArray(saved.hallOfFame) ? saved.hallOfFame : [];
+        state.bestLeadingZeros = saved.bestLeadingZeros || 0;
+        state.bestHashEver = saved.bestHashEver || null;
+        state.alertConfig = saved.alertConfig || state.alertConfig;
       } catch {}
     }
 
@@ -446,7 +570,12 @@
       if ($("harmonicAligned")) $("harmonicAligned").textContent = h.aligned ? "Aligned" : "Waiting";
       if ($("harmonicModeStatus")) $("harmonicModeStatus").textContent = state.harmonicMode || "harmonic-only";
       if ($("harmonicThresholdStatus")) $("harmonicThresholdStatus").textContent = String(state.harmonicThreshold ?? 0.65);
+      if ($("alertEnabled")) $("alertEnabled").value = state.alertConfig?.enabled === false ? "off" : "on";
+      if ($("voiceEnabled")) $("voiceEnabled").value = state.alertConfig?.voice === false ? "off" : "on";
+      if ($("soundEnabled")) $("soundEnabled").value = state.alertConfig?.sound === false ? "off" : "on";
+      if ($("neoZeroThreshold")) $("neoZeroThreshold").value = state.alertConfig?.neoZeroThreshold || 6;
       renderLog();
+      renderHallOfFame();
     }
 
     function renderLog(){
@@ -778,6 +907,9 @@
             state.sharesFound += 1;
 
             if (found.isNetworkTarget && found.headerHex) {
+              showAlert("NETWORK TARGET HIT FROM POOL", `Hash ${found.hash}. Attempting submitblock.`, "danger", { voice:"Attention. Network target hit from pool. Attempting submit block.", browser:true, sticky:true });
+              addHallOfFame(found.hash, { source:"pool-network-target", nonce:found.nonce, height: state.btc.work?.template?.height, harmonic:found.harmonic, force:true });
+
               audit("btc", "network_target_hit", {
                 source: "pool",
                 workerId: payload.workerId,
@@ -802,6 +934,7 @@
 
               submitSolvedBlock(found).then((submitResult) => {
                 if (submitResult === null) {
+                  showAlert("BLOCK ACCEPTED BY BITCOIN CORE", `Hash ${f.hash}`, "success", { voice:"Block accepted by Bitcoin Core.", browser:true, sticky:true });
                   audit("btc", "block_accepted_by_core", {
                     source: "pool",
                     hash: found.hash,
@@ -831,6 +964,10 @@
                 });
               });
             } else {
+              addHallOfFame(found.digest || found.hash, { source:"pool-local", nonce:found.nonce, harmonic:found.harmonic });
+              if (leadingZeroCount(found.digest || found.hash) >= getAlertConfig().neoZeroThreshold) showAlert("Strong Pool Share", `${leadingZeroCount(found.digest || found.hash)} leading zeroes`, "neo", { voice:"Strong pool share found.", browser:true });
+              else showAlert("Pool Share Found", `${String(found.digest || found.hash).slice(0,24)}...`, "share", { voice:"Pool share found." });
+
               audit("pool", "pool_candidate_found", {
                 workerId: payload.workerId,
                 jobId: payload.jobId,
@@ -1631,6 +1768,7 @@
         worker.onmessage = async (event) => {
           const { type, payload } = event.data || {};
           if (type === "btc_worker_started") {
+            showAlert("BTC Worker Started", `Worker ${payload.workerIndex + 1}/${payload.workerCount}`, "info");
             audit("btc", "btc_worker_started", {
               workerIndex: payload.workerIndex,
               workerCount: payload.workerCount,
@@ -1641,6 +1779,7 @@
             return;
           }
           if (type === "btc_worker_error") {
+            showAlert("BTC Worker Error", payload.message, "error", { voice:"BTC worker error.", browser:true });
             audit("btc", "btc_worker_error", {
               error: payload.message,
               timestamp: nowIso()
@@ -1669,6 +1808,8 @@
           rates.set(i, payload.hashRate || 0);
           state.hashRateHps = [...rates.values()].reduce((a,b)=>a+b,0);
           state.lastHash = payload.lastHash || state.lastHash;
+          if (state.lastHash) addHallOfFame(state.lastHash, { source:"btc-header", height: state.btc.work?.template?.height, harmonic: state.harmonic });
+          checkAlignmentAlert(state.harmonic);
 
           // Low-frequency heartbeat so the audit log visibly moves while mining,
           // without filling browser localStorage on every worker batch.
@@ -1689,6 +1830,9 @@
 
           for (const f of payload.found || []){
             state.sharesFound += 1;
+
+            showAlert("NETWORK TARGET HIT", `Hash ${f.hash}. Attempting submitblock.`, "danger", { voice:"Attention. Network target hit. Attempting submit block.", browser:true, sticky:true });
+            addHallOfFame(f.hash, { source:"network-target", nonce:f.nonce, height: state.btc.work?.template?.height, harmonic: f.harmonic || payload.harmonic, force:true });
 
             audit("btc", "network_target_hit", {
               hash: f.hash,
@@ -1755,6 +1899,23 @@
     $("stopBtn").addEventListener("click", stopAll);
     $("clearBtn").addEventListener("click", () => { state.audit = []; saveState(); renderLog(); });
     $("exportBtn").addEventListener("click", exportAudit);
+    if ($("testAlertBtn")) $("testAlertBtn").addEventListener("click", () => {
+      showAlert("Aurora Test Alert", "Neo alert system online.", "neo", { voice:"Aurora alert system online." });
+      addHallOfFame("000000" + Math.random().toString(16).slice(2).padEnd(58,"0"), { source:"test", force:true });
+    });
+    if ($("enableBrowserNotifyBtn")) $("enableBrowserNotifyBtn").addEventListener("click", async () => {
+      try{
+        if(!("Notification" in window)){ showAlert("Browser Notifications Unsupported","This browser does not support Notification API.","error"); return; }
+        const permission = await Notification.requestPermission();
+        state.alertConfig.browser = permission === "granted"; saveState();
+        showAlert("Browser Notifications", permission === "granted" ? "Enabled." : "Not enabled.", permission === "granted" ? "success" : "error", { voice: permission === "granted" ? "Browser notifications enabled." : "Browser notifications not enabled." });
+      }catch(err){ showAlert("Notification Error", String(err.message || err), "error"); }
+    });
+    if ($("clearHallBtn")) $("clearHallBtn").addEventListener("click", () => {
+      state.hallOfFame=[]; state.bestLeadingZeros=0; state.bestHashEver=null; saveState(); renderHallOfFame(); audit("hall","hall_of_fame_cleared",{timestamp:nowIso()});
+    });
+    ["alertEnabled","voiceEnabled","soundEnabled","neoZeroThreshold"].forEach(id => { if($(id)) $(id).addEventListener("change", () => { getAlertConfig(); saveState(); }); });
+    if ($("alertCloseBtn")) $("alertCloseBtn").addEventListener("click", () => $("alertPanel")?.classList.remove("show"));
     $("btcSaveRpcBtn").addEventListener("click", saveRpcConfig);
     $("btcTestBtn").addEventListener("click", () => testBtcNetwork().catch(err => audit("btc", "network_error", { error: String(err.message || err), timestamp: nowIso() })));
     $("btcTemplateBtn").addEventListener("click", () => { audit("btc", "template_button_clicked", { timestamp: nowIso() }); pullBlockTemplate().catch(err => audit("btc", "template_error", { error: String(err.message || err), timestamp: nowIso() })); });
@@ -1816,6 +1977,12 @@
     setBoundaryEnvelope("status", currentStatusPayload());
     render();
     renderBtc();
+    renderHallOfFame();
   </script>
+
+  <div id="screenFlash" class="screen-flash"></div>
+  <div id="neoOverlay" class="neo-overlay"><div class="neo-card"><h2 id="neoTitle">Wake up, Mr. Lewis...</h2><p id="neoMessage">The hash has you.</p></div></div>
+  <div id="alertPanel" class="alert-panel"><button id="alertCloseBtn" class="alert-close ghost">close</button><div id="alertTitle" class="alert-title">Aurora Alert</div><div id="alertBody" class="alert-body">Ready.</div></div>
+
 </body>
 </html>
