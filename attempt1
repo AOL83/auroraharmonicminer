@@ -1,0 +1,1821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aurora BTC Harmonic Miner | Auto Submit Build</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: radial-gradient(circle at 20% 10%, #12324a 0%, #07111e 42%, #02040a 100%);
+      color: #e8f3ff;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+      padding: 24px;
+    }
+    .wrap { max-width: 1180px; margin: 0 auto; }
+    .hero, .card {
+      background: rgba(8, 15, 28, 0.82);
+      border: 1px solid rgba(74, 222, 128, 0.35);
+      border-radius: 22px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+      backdrop-filter: blur(10px);
+    }
+    .hero { padding: 22px; margin-bottom: 18px; }
+    h1 { font-size: clamp(1.7rem, 3vw, 3rem); color: #4ade80; margin-bottom: 6px; }
+    .sub { color: #a9bdd6; max-width: 920px; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+    .card { padding: 18px; }
+    .span-4 { grid-column: span 4; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
+    @media (max-width: 860px) { .span-4, .span-8 { grid-column: span 12; } }
+    label { display: block; font-size: 0.78rem; color: #9fb4cc; margin-bottom: 6px; }
+    input, select, button, textarea {
+      font: inherit;
+      border-radius: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      background: #060b14;
+      color: #e8f3ff;
+      padding: 10px 12px;
+      width: 100%;
+    }
+    input[readonly] { color: #8af7b2; border-color: rgba(74,222,128,0.35); }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+    @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    button { cursor: pointer; width: auto; min-width: 130px; font-weight: 800; }
+    .start { background: #4ade80; color: #06110a; border: none; }
+    .demo { background: #fbbf24; color: #171100; border: none; }
+    .stop { background: #ef4444; color: white; border: none; }
+    .ghost { background: #111827; color: #dbeafe; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
+    @media (max-width: 860px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+    .stat { background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(148,163,184,0.18); border-radius: 16px; padding: 14px; }
+    .stat b { display:block; color:#4ade80; font-size:1.3rem; overflow-wrap:anywhere; }
+    .stat span { color:#9fb4cc; font-size:0.76rem; }
+    .log {
+      height: 340px;
+      overflow: auto;
+      background: #010409;
+      border: 1px solid rgba(74,222,128,0.35);
+      border-radius: 16px;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .ok { color: #4ade80; }
+    .warn { color: #fbbf24; }
+    .bad { color: #fb7185; }
+    .small { font-size: 0.78rem; color: #9fb4cc; margin-top: 8px; }
+    .pill { display:inline-block; padding: 4px 9px; border-radius: 999px; background: rgba(74,222,128,0.12); border: 1px solid rgba(74,222,128,0.35); color:#86efac; font-size: 0.76rem; margin-right: 6px; }
+
+    .pool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+    @media (max-width: 860px) { .pool-grid { grid-template-columns: 1fr; } }
+    .pool-note { border-left: 3px solid #4ade80; padding-left: 10px; }
+
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <h1>⚡ Aurora BTC Harmonic Miner</h1>
+      <p class="sub">BTC Core-connected harmonic header miner. Keeps SSHT π / φ / Fibonacci scoring, pulls real Bitcoin block templates, hashes real block headers, and arms submitblock for a true network-target solution.</p>
+      <p class="small"><span class="pill">Primary payout stamped</span><span class="pill">Fallback stamped</span><span class="pill">No physical miner dependency</span></p>
+    </section>
+
+    <section class="grid">
+      <div class="card span-4">
+        <h2>Address Layer</h2>
+        <div class="row">
+          <div>
+            <label>Primary BTC address</label>
+            <input id="primaryAddress" readonly />
+          </div>
+          <div>
+            <label>Fallback BTC address</label>
+            <input id="fallbackAddress" readonly />
+          </div>
+        </div>
+        <p class="small">These addresses are stamped into audit records. The primary address is used as the block-reward payout address if a real network block is solved.</p>
+      </div>
+
+      <div class="card span-8">
+        <h2>Controls</h2>
+        <div class="row">
+          <div>
+            <label>Difficulty: leading zeroes required</label>
+            <input id="difficulty" type="number" min="1" max="8" value="4" />
+          </div>
+          <div>
+            <label>Worker count</label>
+            <input id="workerCount" type="number" min="1" max="16" value="4" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Harmonic mode</label>
+            <select id="harmonicMode">
+              <option value="continuous">continuous</option>
+              <option value="harmonic-only" selected>harmonic-only</option>
+              <option value="mixed">mixed comparison</option>
+            </select>
+          </div>
+          <div>
+            <label>Harmonic threshold</label>
+            <input id="harmonicThreshold" type="number" min="0.01" max="1" step="0.01" value="0.65" />
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="start" id="startCpuBtn">▶ Start CPU Miner</button>
+          <button class="demo" id="startDemoBtn">◐ Start Demo Mode</button>
+          <button class="stop" id="stopBtn">⏹ Stop</button>
+          <button class="ghost" id="clearBtn">Clear Audit</button>
+          <button class="ghost" id="exportBtn">Export Audit JSON</button>
+        </div>
+        <p class="small">CPU mode performs genuine browser SHA-256 hashing in Web Workers. Demo mode simulates share events for interface testing.</p>
+      </div>
+
+
+
+
+      <div class="card span-12">
+        <h2>🐟 Browser Private Pool Coordinator</h2>
+        <p class="small pool-note">This is the missing own-browser pool layer. It uses BroadcastChannel/local browser messaging so tabs you open can register as workers, receive non-overlapping nonce ranges, report hash-rate, and return found candidates to the Control Nest. This does not recruit unknown visitors; it coordinates your own open browser sessions under this same page/origin.</p>
+        <div class="row">
+          <div>
+            <label>Pool ID</label>
+            <input id="poolId" value="aurora-private-browser-pool" />
+          </div>
+          <div>
+            <label>Nonce range size per job</label>
+            <input id="poolRangeSize" type="number" min="1000" max="50000000" value="250000" />
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="start" id="poolStartCoordinatorBtn">▶ Start Pool Coordinator</button>
+          <button class="ghost" id="poolJoinWorkerBtn">Join This Tab as Worker</button>
+          <button class="stop" id="poolStopBtn">⏹ Stop Pool</button>
+        </div>
+        <div class="pool-grid">
+          <div class="stat"><b id="poolState">Idle</b><span>pool state</span></div>
+          <div class="stat"><b id="poolWorkers">0</b><span>registered workers</span></div>
+          <div class="stat"><b id="poolJobs">0</b><span>assigned jobs</span></div>
+        </div>
+        <p class="small">Use: open the same GitHub page in multiple tabs/windows you control → click “Start Pool Coordinator” in one tab → click “Join This Tab as Worker” in the other tabs.</p>
+      </div>
+
+      <div class="card span-12">
+        <h2>₿ Bitcoin Network Adapter</h2>
+        <p class="small">Connects the Control Nest to a Bitcoin Core JSON-RPC endpoint, pulls real block templates, builds block-reward work paying to the stamped BTC address, sends nonce ranges to the existing browser workers, keeps SSHT harmonic scoring active during header hashing, and submits a solved block back through <code>submitblock</code>. Auto-submit only triggers when a hash meets the real Bitcoin network target, not ordinary 0000 practice shares.</p>
+        <div class="row">
+          <div>
+            <label>Bitcoin RPC URL</label>
+            <input id="btcRpcUrl" placeholder="http://127.0.0.1:8332" value="http://127.0.0.1:8787/btc" />
+          </div>
+          <div>
+            <label>Network</label>
+            <select id="btcNetwork"><option value="main">mainnet</option><option value="test">testnet</option><option value="regtest">regtest</option></select>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>RPC username</label>
+            <input id="btcRpcUser" placeholder="rpcuser" autocomplete="off" />
+          </div>
+          <div>
+            <label>RPC password</label>
+            <input id="btcRpcPass" placeholder="rpcpassword" type="password" autocomplete="off" />
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="ghost" id="btcSaveRpcBtn">Save RPC</button>
+          <button class="ghost" id="btcTestBtn">Test BTC Network</button>
+          <button class="ghost" id="btcTemplateBtn">Pull Block Template</button>
+          <button class="start" id="btcStartBtn">▶ Start BTC Header Miner</button>
+          <button class="stop" id="btcStopBtn">⏹ Stop BTC Miner</button>
+        </div>
+        <div class="stats">
+          <div class="stat"><b id="btcChain">—</b><span>chain</span></div>
+          <div class="stat"><b id="btcHeight">—</b><span>height</span></div>
+          <div class="stat"><b id="btcTarget">—</b><span>target prefix</span></div>
+          <div class="stat"><b id="btcJobState">No job</b><span>btc job state</span></div>
+        </div>
+        <p class="small"><strong>Important:</strong> for a browser page to call Bitcoin Core directly, the RPC endpoint must be reachable by that browser environment and must allow the request origin. Keep credentials private. Use testnet/regtest for first tests.</p><p class="small"><strong>Payout note:</strong> this is not a Coinbase exchange address label. The block-reward output is built to the stamped BTC address above. If that is a Revolut BTC deposit address, confirm Revolut will credit direct mining/block-reward deposits before relying on it.</p>
+      </div>
+
+      <div class="card span-12">
+        <h2>Status</h2>
+        <div class="stats">
+          <div class="stat"><b id="runningState">Idle</b><span>mode</span></div>
+          <div class="stat"><b id="hashesTotal">0</b><span>total hashes</span></div>
+          <div class="stat"><b id="hashRate">0 H/s</b><span>hash rate</span></div>
+          <div class="stat"><b id="sharesFound">0</b><span>found shares</span></div>
+        </div>
+        <div class="stats">
+          <div class="stat"><b id="harmonicScore">—</b><span>harmonic score</span></div>
+          <div class="stat"><b id="harmonicAligned">—</b><span>alignment state</span></div>
+          <div class="stat"><b id="harmonicModeStatus">—</b><span>harmonic mode</span></div>
+          <div class="stat"><b id="harmonicThresholdStatus">—</b><span>harmonic threshold</span></div>
+        </div>
+        <div class="stats">
+          <div class="stat" style="grid-column: span 4;"><b id="lastHash">—</b><span>last hash</span></div>
+        </div>
+      </div>
+
+      <div class="card span-12">
+        <h2>Audit Log</h2>
+        <div class="log" id="auditLog"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const PAYOUT_BTC_ADDRESS = "bc1q8k6jzlfyqs067t4szl6rgawpn0dth4xjt60eef";
+    const FALLBACK_BTC_ADDRESS = "bc1q29yw3hsemexhd3cdpkzdmxg4hhrgwgaj6n8rmv";
+    const STORAGE_KEY = "aurora_virtual_miner_state_v1";
+
+    const state = {
+      running: false,
+      mode: "idle",
+      workers: [],
+      demoTimer: null,
+      difficulty: 4,
+      workerCount: 4,
+      hashesTotal: 0,
+      hashRateHps: 0,
+      sharesFound: 0,
+      lastHash: null,
+      btcLastHeartbeatAt: 0,
+      harmonic: null,
+      harmonicMode: "harmonic-only",
+      harmonicThreshold: 0.65,
+      updatedAt: null,
+      audit: [],
+      btc: { rpcUrl: "http://127.0.0.1:8787/btc", rpcUser: "", rpcPass: "", chain: null, height: null, template: null, work: null, btcWorkers: [] },
+      pool: {
+        channel: null,
+        channelName: "aurora-private-browser-pool",
+        isCoordinator: false,
+        isWorker: false,
+        workerId: null,
+        workers: {},
+        nextNonce: 0,
+        rangeSize: 250000,
+        assignedJobs: 0,
+        localPoolWorker: null
+      }
+    };
+
+    const $ = (id) => document.getElementById(id);
+    function nowIso(){ return new Date().toISOString(); }
+    function formatNum(n){ return Number(n || 0).toLocaleString("en-GB"); }
+    function formatRate(n){ return `${formatNum(Math.round(n || 0))} H/s`; }
+
+    function getHarmonicConfig(){
+      const mode = $("harmonicMode") ? $("harmonicMode").value : (state.harmonicMode || "harmonic-only");
+      const threshold = Number(($("harmonicThreshold") ? $("harmonicThreshold").value : state.harmonicThreshold) || 0.65);
+      state.harmonicMode = mode;
+      state.harmonicThreshold = threshold;
+      return { mode, threshold };
+    }
+
+    function harmonicScoreSnapshot(thresholdOverride){
+      const t = Date.now() / 1000;
+      const phi = (1 + Math.sqrt(5)) / 2;
+      const threshold = Number(thresholdOverride ?? state.harmonicThreshold ?? 0.65);
+      const piPhase = Math.abs(Math.sin(t / Math.PI));
+      const phiPhase = Math.abs(Math.sin(t / phi));
+      const fib13Phase = Math.abs(Math.sin(t / 13));
+      const fib21Phase = Math.abs(Math.sin(t / 21));
+      const score = (piPhase + phiPhase + fib13Phase + fib21Phase) / 4;
+      return {
+        timestamp: nowIso(),
+        score,
+        threshold,
+        aligned: score <= threshold,
+        piPhase,
+        phiPhase,
+        fib13Phase,
+        fib21Phase
+      };
+    }
+
+    function shouldHashHarmonic(harmonic, mode){
+      if (mode === "continuous") return true;
+      if (mode === "harmonic-only") return !!harmonic.aligned;
+      return true;
+    }
+
+    function saveState(){
+      // Keep localStorage small. Large BTC templates/transactions exceed browser quota.
+      const safe = {
+        running: state.running,
+        mode: state.mode,
+        difficulty: state.difficulty,
+        workerCount: state.workerCount,
+        hashesTotal: state.hashesTotal,
+        hashRateHps: 0,
+        sharesFound: state.sharesFound,
+        lastHash: state.lastHash,
+        updatedAt: state.updatedAt,
+        audit: (state.audit || []).slice(0, 120),
+        btc: {
+          rpcUrl: state.btc.rpcUrl,
+          rpcUser: state.btc.rpcUser,
+          rpcPass: state.btc.rpcPass,
+          network: state.btc.network,
+          chain: state.btc.chain,
+          height: state.btc.height,
+          template: state.btc.template ? {
+            height: state.btc.template.height,
+            target: state.btc.template.target,
+            bits: state.btc.template.bits,
+            coinbasevalue: state.btc.template.coinbasevalue,
+            transactionCount: (state.btc.template.transactions || []).length
+          } : null,
+          work: state.btc.work ? {
+            targetHex: state.btc.work.targetHex,
+            txCount: state.btc.work.txCount,
+            payoutAddress: state.btc.work.payoutAddress,
+            fallbackAddress: state.btc.work.fallbackAddress
+          } : null,
+          btcWorkers: []
+        },
+        pool: {
+          channelName: state.pool.channelName,
+          isCoordinator: state.pool.isCoordinator,
+          isWorker: state.pool.isWorker,
+          workerId: state.pool.workerId,
+          workers: state.pool.workers,
+          nextNonce: state.pool.nextNonce,
+          rangeSize: state.pool.rangeSize,
+          assignedJobs: state.pool.assignedJobs
+        }
+      };
+
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(safe));
+      } catch (err) {
+        // Emergency trim if the browser quota is still hit.
+        safe.audit = (safe.audit || []).slice(0, 30);
+        safe.lastHash = null;
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(safe)); } catch {}
+      }
+    }
+
+    function loadState(){
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        state.audit = Array.isArray(saved.audit) ? saved.audit : [];
+        state.hashesTotal = saved.hashesTotal || 0;
+        state.hashRateHps = 0;
+        state.sharesFound = saved.sharesFound || 0;
+        state.lastHash = saved.lastHash || null;
+        state.updatedAt = saved.updatedAt || null;
+      } catch {}
+    }
+
+    function audit(scope, event, payload = {}){
+      const record = { scope, event, at: nowIso(), ...payload };
+      state.audit.unshift(record);
+      state.audit = state.audit.slice(0, 120);
+      saveState();
+      renderLog();
+    }
+
+    function logEvent(message){
+      audit("system", "log", { message });
+    }
+
+    function setBoundaryEnvelope(name, payload){
+      window.AURORA_BOUNDARY = window.AURORA_BOUNDARY || {};
+      window.AURORA_BOUNDARY[name] = payload;
+    }
+
+    function currentStatusPayload(){
+      return {
+        running: state.running,
+        mode: state.mode,
+        difficulty: state.difficulty,
+        workerCount: state.workerCount,
+        hashesTotal: state.hashesTotal,
+        hashRateHps: state.hashRateHps,
+        sharesFound: state.sharesFound,
+        lastHash: state.lastHash,
+        payoutAddress: PAYOUT_BTC_ADDRESS,
+        fallbackAddress: FALLBACK_BTC_ADDRESS,
+        harmonic: state.harmonic,
+        harmonicMode: state.harmonicMode,
+        harmonicThreshold: state.harmonicThreshold,
+        btc: {
+          chain: state.btc.chain,
+          height: state.btc.height,
+          workReady: !!state.btc.work,
+          target: state.btc.work?.targetHex || null
+        },
+        updatedAt: state.updatedAt
+      };
+    }
+
+    function resetCounters(){
+      state.hashesTotal = 0;
+      state.hashRateHps = 0;
+      state.sharesFound = 0;
+      state.lastHash = null;
+      state.updatedAt = nowIso();
+      saveState();
+      render();
+    }
+
+    function render(){
+      $("primaryAddress").value = PAYOUT_BTC_ADDRESS;
+      $("fallbackAddress").value = FALLBACK_BTC_ADDRESS;
+      $("runningState").textContent = state.running ? state.mode : "Idle";
+      $("hashesTotal").textContent = formatNum(state.hashesTotal);
+      $("hashRate").textContent = formatRate(state.hashRateHps);
+      $("sharesFound").textContent = formatNum(state.sharesFound);
+      $("lastHash").textContent = state.lastHash || "—";
+      const h = state.harmonic || harmonicScoreSnapshot();
+      if ($("harmonicScore")) $("harmonicScore").textContent = Number(h.score || 0).toFixed(5);
+      if ($("harmonicAligned")) $("harmonicAligned").textContent = h.aligned ? "Aligned" : "Waiting";
+      if ($("harmonicModeStatus")) $("harmonicModeStatus").textContent = state.harmonicMode || "harmonic-only";
+      if ($("harmonicThresholdStatus")) $("harmonicThresholdStatus").textContent = String(state.harmonicThreshold ?? 0.65);
+      renderLog();
+    }
+
+    function renderLog(){
+      const lines = state.audit.map((r) => JSON.stringify(r));
+      $("auditLog").textContent = lines.join("\n");
+    }
+
+    function startDemoMode(){
+      stopAll();
+      resetCounters();
+      state.running = true;
+      state.mode = "demo";
+      state.difficulty = Number($("difficulty").value || 4);
+      audit("miner", "demo_start", {
+        difficulty: state.difficulty,
+        payoutAddress: PAYOUT_BTC_ADDRESS,
+        fallbackAddress: FALLBACK_BTC_ADDRESS
+      });
+      logEvent("demo mode started");
+      state.demoTimer = setInterval(() => {
+        const hashes = 2500 + Math.floor(Math.random() * 1800);
+        state.hashesTotal += hashes;
+        state.hashRateHps = hashes;
+        const digest = Math.random().toString(16).slice(2).padEnd(64, "0").slice(0, 64);
+        state.lastHash = digest;
+        if (digest.startsWith("0".repeat(Math.min(state.difficulty, 3)))) {
+          state.sharesFound += 1;
+          audit("miner", "demo_share_found", {
+            digest,
+            payoutAddress: PAYOUT_BTC_ADDRESS,
+            fallbackAddress: FALLBACK_BTC_ADDRESS,
+            difficulty: state.difficulty,
+            timestamp: nowIso()
+          });
+        }
+        state.updatedAt = nowIso();
+        setBoundaryEnvelope("status", currentStatusPayload());
+        saveState();
+        render();
+      }, 1000);
+      render();
+    }
+
+    function workerSource(){
+      return `
+        let running = false;
+        let difficulty = 4;
+        function hex(buffer){return [...new Uint8Array(buffer)].map(b=>b.toString(16).padStart(2,'0')).join('');}
+        async function sha256(text){return await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));}
+        async function loop(){
+          while(running){
+            const start = performance.now();
+            let hashes = 0;
+            let shares = 0;
+            let lastHash = null;
+            const found = [];
+            const prefix = '0'.repeat(difficulty);
+            for(let i=0;i<1200;i++){
+              const seed = 'liquid-miner|' + Date.now() + '|' + Math.random() + '|' + i;
+              const h1 = await sha256(seed);
+              const h2 = await sha256(hex(h1));
+              const digest = hex(h2);
+              lastHash = digest;
+              hashes++;
+              if(digest.startsWith(prefix)){
+                shares++;
+                found.push(digest);
+              }
+            }
+            const elapsed = Math.max((performance.now() - start) / 1000, 0.0001);
+            postMessage({ type: 'batch', payload: { hashes, shares, found, lastHash, hashRate: hashes / elapsed } });
+            await new Promise(r => setTimeout(r, 0));
+          }
+        }
+        onmessage = (event) => {
+          const { type, payload } = event.data || {};
+          if(type === 'start'){
+            difficulty = payload.difficulty || 4;
+            running = true;
+            loop();
+          }
+          if(type === 'stop'){
+            running = false;
+          }
+          if(type === 'config'){
+            difficulty = payload.difficulty || difficulty;
+          }
+        };
+      `;
+    }
+
+    function stopCpuMode(){
+      for (const worker of state.workers) {
+        worker.postMessage({ type: "stop" });
+        worker.terminate();
+      }
+      state.workers = [];
+    }
+
+    function startCpuMode(){
+      stopAll();
+      resetCounters();
+      state.difficulty = Math.max(1, Math.min(8, Number($("difficulty").value || 4)));
+      state.workerCount = Math.max(1, Math.min(16, Number($("workerCount").value || 4)));
+      state.running = true;
+      state.mode = "cpu";
+      audit("miner", "cpu_start", {
+        difficulty: state.difficulty,
+        workers: state.workerCount,
+        payoutAddress: PAYOUT_BTC_ADDRESS,
+        fallbackAddress: FALLBACK_BTC_ADDRESS,
+        timestamp: nowIso()
+      });
+      logEvent(`cpu mode started with ${state.workerCount} worker(s)`);
+      const blob = new Blob([workerSource()], { type: "application/javascript" });
+      const url = URL.createObjectURL(blob);
+      const rates = new Map();
+      for (let i = 0; i < state.workerCount; i++) {
+        const worker = new Worker(url);
+        worker.onmessage = (event) => {
+          const { type, payload } = event.data || {};
+          if (type !== "batch") return;
+          state.hashesTotal += payload.hashes || 0;
+          rates.set(i, payload.hashRate || 0);
+          state.hashRateHps = [...rates.values()].reduce((a,b)=>a+b,0);
+          state.lastHash = payload.lastHash || state.lastHash;
+          state.sharesFound += payload.shares || 0;
+          for (const digest of payload.found || []) {
+            audit("miner", "cpu_share_found", {
+              digest,
+              payoutAddress: PAYOUT_BTC_ADDRESS,
+              fallbackAddress: FALLBACK_BTC_ADDRESS,
+              difficulty: state.difficulty,
+              workerIndex: i,
+              timestamp: nowIso()
+            });
+          }
+          state.updatedAt = nowIso();
+          setBoundaryEnvelope("status", currentStatusPayload());
+          saveState();
+          render();
+        };
+        worker.postMessage({ type: "start", payload: { difficulty: state.difficulty } });
+        state.workers.push(worker);
+      }
+      render();
+    }
+
+    function stopAll(){
+      if (state.demoTimer) {
+        clearInterval(state.demoTimer);
+        state.demoTimer = null;
+      }
+      stopCpuMode();
+      if (state.btc && state.btc.btcWorkers && state.btc.btcWorkers.length) {
+        for (const worker of state.btc.btcWorkers) { worker.postMessage({ type: "stop" }); worker.terminate(); }
+        state.btc.btcWorkers = [];
+      }
+      if (state.running) audit("miner", "stop", { timestamp: nowIso() });
+      state.running = false;
+      state.mode = "idle";
+      state.hashRateHps = 0;
+      state.updatedAt = nowIso();
+      setBoundaryEnvelope("status", currentStatusPayload());
+      saveState();
+      render();
+    }
+
+    function exportAudit(){
+      const payload = {
+        exportedAt: nowIso(),
+        payoutAddress: PAYOUT_BTC_ADDRESS,
+        fallbackAddress: FALLBACK_BTC_ADDRESS,
+        status: currentStatusPayload(),
+        audit: state.audit
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `aurora-miner-audit-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+
+
+
+    // ===== BROWSER PRIVATE POOL COORDINATOR: own tabs, non-overlapping work ranges =====
+    function poolNow(){ return Date.now(); }
+    function poolWorkerId(){
+      let id = sessionStorage.getItem("aurora_pool_worker_id");
+      if (!id) {
+        id = "worker-" + Math.random().toString(16).slice(2) + "-" + Date.now();
+        sessionStorage.setItem("aurora_pool_worker_id", id);
+      }
+      return id;
+    }
+
+    function poolChannelName(){
+      return ($("poolId")?.value || "aurora-private-browser-pool").trim();
+    }
+
+    function ensurePoolChannel(){
+      const name = poolChannelName();
+      if (state.pool.channel && state.pool.channelName === name) return state.pool.channel;
+      if (state.pool.channel) state.pool.channel.close();
+      state.pool.channelName = name;
+      state.pool.channel = new BroadcastChannel(name);
+      state.pool.channel.onmessage = onPoolMessage;
+      return state.pool.channel;
+    }
+
+    function poolPost(type, payload = {}){
+      const ch = ensurePoolChannel();
+      ch.postMessage({ type, payload, at: nowIso(), from: state.pool.workerId || "coordinator-page" });
+    }
+
+    function renderPool(){
+      if ($("poolState")) $("poolState").textContent = state.pool.isCoordinator && state.pool.isWorker ? "Coordinator + Worker" : (state.pool.isCoordinator ? "Coordinator" : (state.pool.isWorker ? "Worker" : "Idle"));
+      if ($("poolWorkers")) $("poolWorkers").textContent = Object.keys(state.pool.workers || {}).length;
+      if ($("poolJobs")) $("poolJobs").textContent = formatNum(state.pool.assignedJobs || 0);
+      if ($("poolRangeSize")) $("poolRangeSize").value = state.pool.rangeSize || 250000;
+    }
+
+    function startPoolCoordinator(){
+      ensurePoolChannel();
+      state.pool.isCoordinator = true;
+      state.pool.isWorker = false;
+      state.pool.workers = {};
+      state.pool.nextNonce = 0;
+      state.pool.rangeSize = Math.max(1000, Number($("poolRangeSize")?.value || 250000));
+      state.pool.assignedJobs = 0;
+      audit("pool", "coordinator_started", {
+        poolId: state.pool.channelName,
+        rangeSize: state.pool.rangeSize,
+        btcWorkReady: !!state.btc.work,
+        payoutAddress: PAYOUT_BTC_ADDRESS,
+        fallbackAddress: FALLBACK_BTC_ADDRESS,
+        timestamp: nowIso()
+      });
+      poolPost("coordinator_online", { poolId: state.pool.channelName });
+      renderPool();
+    }
+
+    function stopPool(){
+      if (state.pool.localPoolWorker) {
+        state.pool.localPoolWorker.postMessage({ type: "stop" });
+        state.pool.localPoolWorker.terminate();
+        state.pool.localPoolWorker = null;
+      }
+      poolPost("pool_stop", {});
+      state.pool.isCoordinator = false;
+      state.pool.isWorker = false;
+      state.pool.workers = {};
+      state.pool.assignedJobs = 0;
+      audit("pool", "pool_stopped", { timestamp: nowIso() });
+      renderPool();
+    }
+
+    function assignPoolJob(workerId){
+      if (!state.pool.isCoordinator) return;
+      const startNonce = state.pool.nextNonce >>> 0;
+      const count = Math.max(1000, Number(state.pool.rangeSize || 250000));
+      state.pool.nextNonce = (state.pool.nextNonce + count) >>> 0;
+      state.pool.assignedJobs += 1;
+
+      const harmonicCfg = getHarmonicConfig();
+      const job = {
+        jobId: "job-" + state.pool.assignedJobs + "-" + Date.now(),
+        startNonce,
+        count,
+        btcWork: state.btc.work || null,
+        localDifficulty: Math.max(1, Math.min(8, Number($("difficulty")?.value || 4))),
+        harmonicMode: harmonicCfg.mode,
+        harmonicThreshold: harmonicCfg.threshold,
+        payoutAddress: PAYOUT_BTC_ADDRESS,
+        fallbackAddress: FALLBACK_BTC_ADDRESS
+      };
+
+      poolPost("job_assign", { workerId, job });
+
+      // Direct same-page handoff for one-page testing.
+      if (state.pool.isWorker && state.pool.workerId === workerId) {
+        startPoolLocalJob(job);
+      }
+
+      audit("pool", "job_assigned", {
+        workerId,
+        jobId: job.jobId,
+        startNonce,
+        count,
+        mode: job.btcWork ? "btc-network-work" : "local-pow-work",
+        timestamp: nowIso()
+      });
+      renderPool();
+    }
+
+    function onPoolMessage(event){
+      const msg = event.data || {};
+      const type = msg.type;
+      const payload = msg.payload || {};
+
+      if (state.pool.isCoordinator) {
+        if (type === "worker_register") {
+          state.pool.workers[payload.workerId] = {
+            workerId: payload.workerId,
+            joinedAt: payload.joinedAt || nowIso(),
+            lastSeen: nowIso(),
+            hashRate: 0
+          };
+          audit("pool", "worker_registered", { workerId: payload.workerId, timestamp: nowIso() });
+          assignPoolJob(payload.workerId);
+          renderPool();
+        }
+
+        if (type === "worker_report") {
+          const w = state.pool.workers[payload.workerId] || { workerId: payload.workerId };
+          w.lastSeen = nowIso();
+          w.hashRate = payload.hashRate || 0;
+          w.hashes = (w.hashes || 0) + (payload.hashes || 0);
+          state.pool.workers[payload.workerId] = w;
+
+          state.hashesTotal += payload.hashes || 0;
+          state.hashRateHps = Object.values(state.pool.workers).reduce((a,b)=>a+(b.hashRate||0),0);
+          state.lastHash = payload.lastHash || state.lastHash;
+
+          for (const found of payload.found || []) {
+            state.sharesFound += 1;
+
+            if (found.isNetworkTarget && found.headerHex) {
+              audit("btc", "network_target_hit", {
+                source: "pool",
+                workerId: payload.workerId,
+                jobId: payload.jobId,
+                hash: found.hash,
+                nonce: found.nonce,
+                height: state.btc.work?.template?.height,
+                target: state.btc.work?.targetHex,
+                harmonic: found.harmonic || null,
+                payoutAddress: PAYOUT_BTC_ADDRESS,
+                fallbackAddress: FALLBACK_BTC_ADDRESS,
+                timestamp: nowIso()
+              });
+
+              stopPool();
+              stopBtcMode();
+              state.running = false;
+              state.mode = "btc-solution-found";
+              state.hashRateHps = 0;
+              render();
+              renderBtc();
+
+              submitSolvedBlock(found).then((submitResult) => {
+                if (submitResult === null) {
+                  audit("btc", "block_accepted_by_core", {
+                    source: "pool",
+                    hash: found.hash,
+                    nonce: found.nonce,
+                    height: state.btc.work?.template?.height,
+                    note: "Bitcoin Core returned null, which means accepted under submitblock semantics.",
+                    timestamp: nowIso()
+                  });
+                } else {
+                  audit("btc", "block_rejected_by_core", {
+                    source: "pool",
+                    hash: found.hash,
+                    nonce: found.nonce,
+                    height: state.btc.work?.template?.height,
+                    reason: String(submitResult),
+                    timestamp: nowIso()
+                  });
+                }
+              }).catch((err) => {
+                audit("btc", "submitblock_error", {
+                  source: "pool",
+                  hash: found.hash,
+                  nonce: found.nonce,
+                  height: state.btc.work?.template?.height,
+                  error: String(err.message || err),
+                  timestamp: nowIso()
+                });
+              });
+            } else {
+              audit("pool", "pool_candidate_found", {
+                workerId: payload.workerId,
+                jobId: payload.jobId,
+                digest: found.digest || found.hash,
+                nonce: found.nonce,
+                harmonic: found.harmonic || null,
+                payoutAddress: PAYOUT_BTC_ADDRESS,
+                fallbackAddress: FALLBACK_BTC_ADDRESS,
+                timestamp: nowIso()
+              });
+            }
+          }
+
+          if (payload.done) assignPoolJob(payload.workerId);
+          saveState();
+          render();
+          renderPool();
+        }
+      }
+
+      if (state.pool.isWorker) {
+        if (type === "pool_stop") stopPoolLocalWorker();
+        if (type === "job_assign" && payload.workerId === state.pool.workerId) startPoolLocalJob(payload.job);
+      }
+    }
+
+    function poolWorkerSource(){
+      return `
+        let running = false;
+        let currentJob = null;
+
+        function hex(buffer){return [...new Uint8Array(buffer)].map(b=>b.toString(16).padStart(2,'0')).join('');}
+        const hexToBytes = (hex) => new Uint8Array(hex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+        const bytesToHex = (bytes) => [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+        const reverseHex = (hex) => hex.match(/.{1,2}/g).reverse().join('');
+
+        function u32le(n){
+          const b=new Uint8Array(4);
+          new DataView(b.buffer).setUint32(0,n>>>0,true);
+          return bytesToHex(b);
+        }
+
+        async function sha256(text){return await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));}
+
+        async function doubleShaHex(hexValue){
+          const h1=await crypto.subtle.digest('SHA-256',hexToBytes(hexValue));
+          const h2=await crypto.subtle.digest('SHA-256',new Uint8Array(h1));
+          return bytesToHex(new Uint8Array(h2));
+        }
+
+        function meetsTarget(hashInternal, targetHex){
+          return BigInt('0x'+reverseHex(hashInternal)) <= BigInt('0x'+targetHex);
+        }
+
+        function harmonicScore(threshold){
+          const t=Date.now()/1000, phi=(1+Math.sqrt(5))/2;
+          const piPhase=Math.abs(Math.sin(t/Math.PI));
+          const phiPhase=Math.abs(Math.sin(t/phi));
+          const fib13Phase=Math.abs(Math.sin(t/13));
+          const fib21Phase=Math.abs(Math.sin(t/21));
+          const score=(piPhase+phiPhase+fib13Phase+fib21Phase)/4;
+          return {
+            timestamp:new Date().toISOString(),
+            score,
+            threshold,
+            aligned:score<=threshold,
+            piPhase,
+            phiPhase,
+            fib13Phase,
+            fib21Phase
+          };
+        }
+
+        function shouldHash(h, mode){
+          if(mode==='continuous') return true;
+          if(mode==='harmonic-only') return !!h.aligned;
+          return true;
+        }
+
+        async function runLocalJob(job){
+          const startTime = performance.now();
+          let hashes = 0;
+          let found = [];
+          let lastHash = null;
+
+          const harmonicMode = job.harmonicMode || 'harmonic-only';
+          const harmonicThreshold = Number(job.harmonicThreshold || 0.65);
+          const btcWork = job.btcWork || null;
+          const localPrefix = '0'.repeat(job.localDifficulty || 4);
+
+          for(let offset=0; running && offset<job.count; offset++){
+            const hs = harmonicScore(harmonicThreshold);
+
+            if(!shouldHash(hs, harmonicMode)){
+              if(offset % 1000 === 0) await new Promise(r=>setTimeout(r,10));
+              continue;
+            }
+
+            const nonce = (job.startNonce + offset) >>> 0;
+
+            if(btcWork){
+              const headerHex = btcWork.headerPrefixHex + u32le(nonce);
+              const digestInternal = await doubleShaHex(headerHex);
+              const displayHash = reverseHex(digestInternal);
+              lastHash = displayHash;
+              hashes++;
+
+              if(meetsTarget(digestInternal, btcWork.targetHex)){
+                found.push({
+                  isNetworkTarget:true,
+                  nonce,
+                  hash:displayHash,
+                  headerHex,
+                  harmonic:hs
+                });
+              }
+            } else {
+              const seed = 'aurora-private-pool|' + job.jobId + '|' + nonce + '|' + job.payoutAddress;
+              const h1 = await sha256(seed);
+              const h2 = await sha256(hex(h1));
+              const digest = hex(h2);
+              lastHash = digest;
+              hashes++;
+              if(digest.startsWith(localPrefix)) found.push({ isNetworkTarget:false, nonce, digest, harmonic:hs });
+            }
+
+            if(offset % 1000 === 0) await new Promise(r=>setTimeout(r,0));
+          }
+
+          const elapsed = Math.max((performance.now() - startTime) / 1000, 0.0001);
+          postMessage({ type:'worker_report', payload:{ jobId:job.jobId, hashes, found, lastHash, hashRate:hashes/elapsed, done:true }});
+        }
+
+        onmessage = (event) => {
+          const { type, payload } = event.data || {};
+          if(type === 'start_job'){
+            running = true;
+            currentJob = payload.job;
+            runLocalJob(currentJob);
+          }
+          if(type === 'stop'){
+            running = false;
+          }
+        };
+      `;
+    }
+
+    function joinPoolAsWorker(){
+      ensurePoolChannel();
+      state.pool.isWorker = true;
+      // IMPORTANT: do not switch coordinator off.
+      // A single page test must be allowed to act as both coordinator and worker.
+      state.pool.workerId = poolWorkerId();
+
+      audit("pool", "worker_join_requested", {
+        workerId: state.pool.workerId,
+        poolId: state.pool.channelName,
+        singlePageCoordinator: !!state.pool.isCoordinator,
+        timestamp: nowIso()
+      });
+
+      const registration = {
+        type: "worker_register",
+        payload: { workerId: state.pool.workerId, joinedAt: nowIso() },
+        at: nowIso(),
+        from: state.pool.workerId
+      };
+
+      // BroadcastChannel does not reliably deliver to the same page/channel object.
+      // So for the single-page test, call the coordinator handler directly too.
+      if (state.pool.isCoordinator) {
+        onPoolMessage({ data: registration });
+      } else {
+        poolPost("worker_register", registration.payload);
+      }
+
+      renderPool();
+    }
+
+    function stopPoolLocalWorker(){
+      if (state.pool.localPoolWorker) {
+        state.pool.localPoolWorker.postMessage({ type: "stop" });
+        state.pool.localPoolWorker.terminate();
+        state.pool.localPoolWorker = null;
+      }
+      state.pool.isWorker = false;
+      renderPool();
+    }
+
+
+    async function runPoolJobOnMainThread(job){
+      const startTime = performance.now();
+      let hashes = 0;
+      let found = [];
+      let lastHash = null;
+
+      const harmonicMode = job.harmonicMode || "harmonic-only";
+      const harmonicThreshold = Number(job.harmonicThreshold || 0.65);
+      const btcWork = job.btcWork || null;
+      const localPrefix = "0".repeat(job.localDifficulty || 4);
+
+      async function sha256Text(text){
+        return await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+      }
+      function bufHex(buffer){
+        return [...new Uint8Array(buffer)].map(b=>b.toString(16).padStart(2,"0")).join("");
+      }
+
+      for(let offset = 0; offset < job.count; offset++){
+        const hs = harmonicScoreSnapshot(harmonicThreshold);
+
+        if(!shouldHashHarmonic(hs, harmonicMode)){
+          if(offset % 1000 === 0) await new Promise(r=>setTimeout(r,10));
+          continue;
+        }
+
+        const nonce = (job.startNonce + offset) >>> 0;
+
+        if(btcWork){
+          const headerHex = btcWork.headerPrefixHex + u32le(nonce);
+          const digestInternal = await doubleShaHex(headerHex);
+          const displayHash = reverseHex(digestInternal);
+          lastHash = displayHash;
+          hashes++;
+
+          if(displayHashMeetsTarget(displayHash, btcWork.targetHex)){
+            found.push({
+              isNetworkTarget:true,
+              nonce,
+              hash:displayHash,
+              headerHex,
+              harmonic:hs
+            });
+          }
+        } else {
+          const seed = "aurora-private-pool|" + job.jobId + "|" + nonce + "|" + job.payoutAddress;
+          const h1 = await sha256Text(seed);
+          const h2 = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(bufHex(h1)));
+          const digest = bufHex(h2);
+          lastHash = digest;
+          hashes++;
+          if(digest.startsWith(localPrefix)) found.push({ isNetworkTarget:false, nonce, digest, harmonic:hs });
+        }
+
+        if(offset % 1000 === 0) await new Promise(r=>setTimeout(r,0));
+      }
+
+      const elapsed = Math.max((performance.now() - startTime) / 1000, 0.0001);
+      return { jobId: job.jobId, hashes, found, lastHash, hashRate: hashes / elapsed, done: true };
+    }
+
+    function startPoolLocalJob(job){
+      if (state.pool.localPoolWorker) {
+        state.pool.localPoolWorker.postMessage({ type: "stop" });
+        state.pool.localPoolWorker.terminate();
+      }
+
+      audit("pool", "worker_job_started", {
+        workerId: state.pool.workerId,
+        jobId: job.jobId,
+        startNonce: job.startNonce,
+        count: job.count,
+        mode: job.btcWork ? "btc-network-work" : "local-pow-work",
+        timestamp: nowIso()
+      });
+
+      const handleWorkerPayload = (payload) => {
+        const report = {
+          type: "worker_report",
+          payload: {
+            workerId: state.pool.workerId,
+            ...payload
+          },
+          at: nowIso(),
+          from: state.pool.workerId
+        };
+
+        if (state.pool.isCoordinator) {
+          onPoolMessage({ data: report });
+        } else {
+          poolPost("worker_report", report.payload);
+        }
+
+        audit("pool", "worker_job_completed", {
+          workerId: state.pool.workerId,
+          jobId: payload.jobId,
+          hashes: payload.hashes,
+          foundCount: (payload.found || []).length,
+          timestamp: nowIso()
+        });
+      };
+
+      try {
+        const blob = new Blob([poolWorkerSource()], { type: "application/javascript" });
+        const url = URL.createObjectURL(blob);
+        const worker = new Worker(url);
+        state.pool.localPoolWorker = worker;
+
+        worker.onmessage = (event) => {
+          const { type, payload } = event.data || {};
+          if (type !== "worker_report") return;
+          handleWorkerPayload(payload);
+        };
+
+        worker.postMessage({ type: "start_job", payload: { job } });
+      } catch (err) {
+        audit("pool", "worker_blob_blocked_main_thread_fallback", {
+          error: String(err.message || err),
+          timestamp: nowIso()
+        });
+        runPoolJobOnMainThread(job).then(handleWorkerPayload);
+      }
+    }
+
+    // ===== BTC NETWORK ADAPTER: real Bitcoin Core RPC + block-template header work =====
+    const BTC_RPC_STORAGE_KEY = "aurora_btc_rpc_config_v1";
+
+    function loadRpcConfig(){
+      try {
+        const raw = localStorage.getItem(BTC_RPC_STORAGE_KEY);
+        if (!raw) return;
+        const cfg = JSON.parse(raw);
+        state.btc.rpcUrl = cleanRpcUrl(cfg.rpcUrl || state.btc.rpcUrl);
+        state.btc.rpcUser = cfg.rpcUser || "";
+        state.btc.rpcPass = cfg.rpcPass || "";
+        state.btc.network = cfg.network || "main";
+      } catch {}
+    }
+
+
+    function cleanRpcUrl(value){
+      let v = String(value || "").trim();
+      v = v.replace(/^RPC\s*URL\s*:\s*/i, "").trim();
+      return v;
+    }
+
+    function saveRpcConfig(){
+      state.btc.rpcUrl = cleanRpcUrl($("btcRpcUrl").value);
+      state.btc.rpcUser = $("btcRpcUser").value.trim();
+      state.btc.rpcPass = $("btcRpcPass").value;
+      state.btc.network = $("btcNetwork").value;
+      localStorage.setItem(BTC_RPC_STORAGE_KEY, JSON.stringify({ rpcUrl: state.btc.rpcUrl, rpcUser: state.btc.rpcUser, rpcPass: state.btc.rpcPass, network: state.btc.network }));
+      audit("btc", "rpc_saved", { rpcUrl: state.btc.rpcUrl, network: state.btc.network, timestamp: nowIso() });
+      renderBtc();
+    renderPool();
+    }
+
+    async function btcRpc(method, params = []){
+      const auth = btoa(`${state.btc.rpcUser}:${state.btc.rpcPass}`);
+      const res = await fetch(state.btc.rpcUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Basic ${auth}` },
+        body: JSON.stringify({ jsonrpc: "1.0", id: `aurora-${Date.now()}`, method, params })
+      });
+
+      const text = await res.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch (err) {
+        throw new Error(`RPC ${method} returned non-JSON response: ${text.slice(0,160)}`);
+      }
+
+      if (!res.ok) {
+        throw new Error(`RPC ${method} HTTP ${res.status}: ${json.error ? JSON.stringify(json.error) : text.slice(0,160)}`);
+      }
+
+      if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+      return json.result;
+    }
+
+    function renderBtc(){
+      if ($("btcRpcUrl")) $("btcRpcUrl").value = cleanRpcUrl(state.btc.rpcUrl || "");
+      if ($("btcRpcUser")) $("btcRpcUser").value = state.btc.rpcUser || "";
+      if ($("btcRpcPass")) $("btcRpcPass").value = state.btc.rpcPass || "";
+      if ($("btcNetwork") && state.btc.network) $("btcNetwork").value = state.btc.network;
+      if ($("btcChain")) $("btcChain").textContent = state.btc.chain || "—";
+      if ($("btcHeight")) $("btcHeight").textContent = state.btc.height ?? "—";
+      if ($("btcTarget")) $("btcTarget").textContent = state.btc.template?.target ? state.btc.template.target.slice(0, 18) + "…" : "—";
+      if ($("btcJobState")) $("btcJobState").textContent = state.btc.work ? "Work ready" : "No job";
+    }
+
+    const hexToBytes = (hex) => new Uint8Array(hex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+    const bytesToHex = (bytes) => [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
+    const reverseHex = (hex) => hex.match(/.{1,2}/g).reverse().join("");
+    const u32le = (n) => {
+      const b = new Uint8Array(4);
+      new DataView(b.buffer).setUint32(0, n >>> 0, true);
+      return bytesToHex(b);
+    };
+    function varInt(n){
+      if (n < 0xfd) return n.toString(16).padStart(2, "0");
+      if (n <= 0xffff) return "fd" + n.toString(16).padStart(4,"0").match(/../g).reverse().join("");
+      return "fe" + u32le(n);
+    }
+    function pushDataHex(hex){
+      const len = hex.length / 2;
+      if (len < 0x4c) return len.toString(16).padStart(2,"0") + hex;
+      if (len <= 0xff) return "4c" + len.toString(16).padStart(2,"0") + hex;
+      throw new Error("pushData too long for this build");
+    }
+    function encodeHeightScript(height){
+      let h = height;
+      let hex = "";
+      while (h > 0) { hex += (h & 255).toString(16).padStart(2,"0"); h = Math.floor(h / 256); }
+      if (!hex) hex = "00";
+      return pushDataHex(hex);
+    }
+    async function doubleShaHex(hex){
+      const h1 = await crypto.subtle.digest("SHA-256", hexToBytes(hex));
+      const h2 = await crypto.subtle.digest("SHA-256", new Uint8Array(h1));
+      return bytesToHex(new Uint8Array(h2));
+    }
+
+    function displayHashMeetsTarget(displayHash, targetHex){
+      return BigInt("0x" + displayHash) <= BigInt("0x" + targetHex);
+    }
+
+    // Bech32 decoder for bc1q... P2WPKH/P2WSH payout script construction.
+    const BECH32 = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+    function bech32Polymod(values){
+      const gen = [0x3b6a57b2,0x26508e6d,0x1ea119fa,0x3d4233dd,0x2a1462b3];
+      let chk = 1;
+      for (const v of values){
+        const top = chk >> 25;
+        chk = ((chk & 0x1ffffff) << 5) ^ v;
+        for (let i=0;i<5;i++) if ((top >> i) & 1) chk ^= gen[i];
+      }
+      return chk;
+    }
+    function bech32HrpExpand(hrp){
+      const ret = [];
+      for (let i=0;i<hrp.length;i++) ret.push(hrp.charCodeAt(i) >> 5);
+      ret.push(0);
+      for (let i=0;i<hrp.length;i++) ret.push(hrp.charCodeAt(i) & 31);
+      return ret;
+    }
+    function convertBits(data, fromBits, toBits, pad){
+      let acc = 0, bits = 0;
+      const ret = [];
+      const maxv = (1 << toBits) - 1;
+      for (const value of data){
+        if (value < 0 || (value >> fromBits)) throw new Error("invalid bech32 data");
+        acc = (acc << fromBits) | value;
+        bits += fromBits;
+        while (bits >= toBits){
+          bits -= toBits;
+          ret.push((acc >> bits) & maxv);
+        }
+      }
+      if (pad && bits) ret.push((acc << (toBits - bits)) & maxv);
+      return ret;
+    }
+    function decodeBech32(address){
+      const a = address.toLowerCase();
+      const pos = a.lastIndexOf("1");
+      if (pos < 1) throw new Error("invalid bech32 address");
+      const hrp = a.slice(0,pos);
+      const chars = a.slice(pos+1);
+      const data = [...chars].map(c => BECH32.indexOf(c));
+      if (data.some(x => x < 0)) throw new Error("invalid bech32 characters");
+      if (bech32Polymod(bech32HrpExpand(hrp).concat(data)) !== 1) throw new Error("bech32 checksum failed");
+      const version = data[0];
+      const program = convertBits(data.slice(1,-6), 5, 8, false);
+      return { hrp, version, program };
+    }
+    function scriptPubKeyFromBech32(address){
+      const d = decodeBech32(address);
+      if (d.version !== 0) throw new Error("only v0 segwit addresses supported in this build");
+      if (d.program.length !== 20 && d.program.length !== 32) throw new Error("invalid witness program length");
+      return "00" + d.program.length.toString(16).padStart(2,"0") + bytesToHex(d.program);
+    }
+
+    function buildCoinbaseTx(template){
+      const payoutScript = scriptPubKeyFromBech32(PAYOUT_BTC_ADDRESS);
+      const tagHex = bytesToHex(new TextEncoder().encode("Aurora Virtual Miner"));
+      const scriptSig = encodeHeightScript(template.height) + pushDataHex(tagHex);
+      const primaryValue = BigInt(template.coinbasevalue || 0);
+      const outValueHex = (() => { const b = new Uint8Array(8); new DataView(b.buffer).setBigUint64(0, primaryValue, true); return bytesToHex(b); })();
+      let outputs = outValueHex + varInt(payoutScript.length/2) + payoutScript;
+      let outputCount = 1;
+      if (template.default_witness_commitment){
+        outputs += "0000000000000000" + varInt(template.default_witness_commitment.length/2) + template.default_witness_commitment;
+        outputCount++;
+      }
+      const baseNoWitness =
+        "01000000" +
+        "01" +
+        "00".repeat(32) + "ffffffff" +
+        varInt(scriptSig.length/2) + scriptSig +
+        "ffffffff" +
+        varInt(outputCount) + outputs +
+        "00000000";
+      const withWitness = template.default_witness_commitment
+        ? "01000000" + "0001" + "01" + "00".repeat(32) + "ffffffff" + varInt(scriptSig.length/2) + scriptSig + "ffffffff" + varInt(outputCount) + outputs + "01" + "20" + "00".repeat(32) + "00000000"
+        : baseNoWitness;
+      return { txidHexInternalPromise: doubleShaHex(baseNoWitness), noWitnessHex: baseNoWitness, blockHex: withWitness };
+    }
+
+    async function merkleRootInternal(txidsInternal){
+      let layer = txidsInternal.slice();
+      if (!layer.length) throw new Error("empty merkle layer");
+      let round = 0;
+
+      while (layer.length > 1){
+        round++;
+        const next = [];
+
+        for (let i=0;i<layer.length;i+=2){
+          const a = layer[i];
+          const b = layer[i+1] || a;
+          next.push(await doubleShaHex(a + b));
+
+          if (i % 128 === 0) {
+            await new Promise(r => setTimeout(r, 0));
+          }
+        }
+
+        audit("btc", "merkle_round_done", {
+          round,
+          previousLayer: layer.length,
+          nextLayer: next.length,
+          timestamp: nowIso()
+        });
+
+        layer = next;
+        await new Promise(r => setTimeout(r, 0));
+      }
+
+      return layer[0];
+    }
+
+    async function buildBtcWork(template){
+      audit("btc", "building_btc_work", {
+        height: template.height,
+        txCount: (template.transactions || []).length,
+        timestamp: nowIso()
+      });
+
+      const coinbase = buildCoinbaseTx(template);
+      const coinbaseTxidInternal = await coinbase.txidHexInternalPromise;
+
+      audit("btc", "coinbase_built", {
+        height: template.height,
+        coinbasevalue: template.coinbasevalue,
+        timestamp: nowIso()
+      });
+
+      const txidsInternal = [coinbaseTxidInternal].concat((template.transactions || []).map(t => reverseHex(t.txid)));
+
+      audit("btc", "merkle_build_start", {
+        txids: txidsInternal.length,
+        timestamp: nowIso()
+      });
+
+      const merkleInternal = await merkleRootInternal(txidsInternal);
+
+      audit("btc", "merkle_build_done", {
+        merkleInternal,
+        timestamp: nowIso()
+      });
+
+      const version = template.version >>> 0;
+      const prevInternal = reverseHex(template.previousblockhash);
+      const time = template.curtime >>> 0;
+      const bitsHex = reverseHex(template.bits);
+      const headerPrefixHex = u32le(version) + prevInternal + merkleInternal + u32le(time) + bitsHex;
+      const txCount = 1 + (template.transactions || []).length;
+      const tailTxHex = (template.transactions || []).map(t => t.data).join("");
+
+      return { template, headerPrefixHex, targetHex: template.target, txCount, coinbaseBlockHex: coinbase.blockHex, tailTxHex, payoutAddress: PAYOUT_BTC_ADDRESS, fallbackAddress: FALLBACK_BTC_ADDRESS };
+    }
+
+    function buildSolvedBlockHex(work, solution){
+      if (!work) throw new Error("No BTC work object exists");
+      if (!solution || !solution.headerHex) throw new Error("No solved header was supplied");
+      return solution.headerHex + varInt(work.txCount) + work.coinbaseBlockHex + work.tailTxHex;
+    }
+
+    async function submitSolvedBlock(solution){
+      const work = state.btc.work;
+      const blockHex = buildSolvedBlockHex(work, solution);
+
+      audit("btc", "submitblock_attempt", {
+        height: work.template.height,
+        hash: solution.hash,
+        nonce: solution.nonce,
+        harmonic: solution.harmonic || null,
+        blockBytes: blockHex.length / 2,
+        txCount: work.txCount,
+        payoutAddress: PAYOUT_BTC_ADDRESS,
+        fallbackAddress: FALLBACK_BTC_ADDRESS,
+        timestamp: nowIso()
+      });
+
+      const result = await btcRpc("submitblock", [blockHex]);
+
+      audit("btc", "submitblock_result", {
+        height: work.template.height,
+        hash: solution.hash,
+        nonce: solution.nonce,
+        result: result === null ? "accepted" : result,
+        accepted: result === null,
+        timestamp: nowIso()
+      });
+
+      return result;
+    }
+
+    function btcWorkerSource(){
+      return `
+        let running=false, work=null, workerIndex=0, workerCount=1, nonce=0;
+        let harmonicMode="harmonic-only", harmonicThreshold=0.65;
+
+        const hexToBytes = (hex) => new Uint8Array(hex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+        const bytesToHex = (bytes) => [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+        const reverseHex = (hex) => hex.match(/.{1,2}/g).reverse().join('');
+
+        function u32le(n){
+          const b=new Uint8Array(4);
+          new DataView(b.buffer).setUint32(0,n>>>0,true);
+          return bytesToHex(b);
+        }
+
+        async function doubleShaHex(hex){
+          const h1=await crypto.subtle.digest('SHA-256',hexToBytes(hex));
+          const h2=await crypto.subtle.digest('SHA-256',new Uint8Array(h1));
+          return bytesToHex(new Uint8Array(h2));
+        }
+
+        function meetsTarget(hashInternal, targetHex){
+          return BigInt('0x'+reverseHex(hashInternal)) <= BigInt('0x'+targetHex);
+        }
+
+        function harmonicScore(){
+          const t=Date.now()/1000, phi=(1+Math.sqrt(5))/2;
+          const piPhase=Math.abs(Math.sin(t/Math.PI));
+          const phiPhase=Math.abs(Math.sin(t/phi));
+          const fib13Phase=Math.abs(Math.sin(t/13));
+          const fib21Phase=Math.abs(Math.sin(t/21));
+          const score=(piPhase+phiPhase+fib13Phase+fib21Phase)/4;
+          return {
+            timestamp:new Date().toISOString(),
+            score,
+            threshold:harmonicThreshold,
+            aligned:score<=harmonicThreshold,
+            piPhase,
+            phiPhase,
+            fib13Phase,
+            fib21Phase
+          };
+        }
+
+        function shouldHash(h){
+          if(harmonicMode==='continuous') return true;
+          if(harmonicMode==='harmonic-only') return h.aligned;
+          return true;
+        }
+
+        async function loop(){
+          while(running && work){
+            const hs = harmonicScore();
+
+            if(!shouldHash(hs)){
+              postMessage({type:'btc_waiting',payload:{harmonic:hs}});
+              await new Promise(r=>setTimeout(r,50));
+              continue;
+            }
+
+            const start = performance.now();
+            let hashes=0, lastHash=null, found=[];
+
+            for(let i=0;i<800;i++){
+              const n = (nonce + workerIndex) >>> 0;
+              nonce = (nonce + workerCount) >>> 0;
+
+              const headerHex = work.headerPrefixHex + u32le(n);
+              const digest = await doubleShaHex(headerHex);
+              const displayHash = reverseHex(digest);
+
+              lastHash = displayHash;
+              hashes++;
+
+              if(meetsTarget(digest, work.targetHex)){
+                found.push({ nonce:n, hash:displayHash, headerHex, harmonic:hs });
+              }
+            }
+
+            const elapsed=Math.max((performance.now()-start)/1000,0.0001);
+            postMessage({type:'btc_batch',payload:{hashes,lastHash,found,hashRate:hashes/elapsed,harmonic:hs}});
+            await new Promise(r=>setTimeout(r,0));
+          }
+        }
+
+        onmessage=(event)=>{
+          const {type,payload}=event.data||{};
+          if(type==='start_btc'){
+            work=payload.work;
+            workerIndex=payload.workerIndex;
+            workerCount=payload.workerCount;
+            nonce=payload.startNonce>>>0;
+            harmonicMode=payload.harmonicMode || 'harmonic-only';
+            harmonicThreshold=Number(payload.harmonicThreshold || 0.65);
+            running=true;
+            postMessage({type:'btc_worker_started',payload:{workerIndex,workerCount,harmonicMode,harmonicThreshold}});
+            loop().catch(err => postMessage({type:'btc_worker_error',payload:{message:String(err && err.message ? err.message : err)}}));
+          }
+          if(type==='stop'){ running=false; }
+        };
+      `;
+    }
+
+    async function testBtcNetwork(){
+      saveRpcConfig();
+      const info = await btcRpc("getblockchaininfo", []);
+      state.btc.chain = info.chain;
+      state.btc.height = info.blocks;
+      audit("btc", "network_connected", { chain: info.chain, blocks: info.blocks, headers: info.headers, verificationprogress: info.verificationprogress, timestamp: nowIso() });
+      renderBtc();
+    }
+
+    async function pullBlockTemplate(){
+      saveRpcConfig();
+
+      audit("btc", "template_request_sent", {
+        rpcUrl: state.btc.rpcUrl,
+        params: [{ rules: ["segwit"] }],
+        timestamp: nowIso()
+      });
+
+      const template = await btcRpc("getblocktemplate", [{ rules: ["segwit"] }]);
+
+      audit("btc", "template_response_received", {
+        height: template.height,
+        target: template.target,
+        bits: template.bits,
+        txCount: (template.transactions || []).length,
+        coinbasevalue: template.coinbasevalue,
+        timestamp: nowIso()
+      });
+
+      state.btc.template = template;
+      state.btc.height = template.height;
+      renderBtc();
+      saveState();
+
+      state.btc.work = await buildBtcWork(template);
+
+      audit("btc", "block_template_ready", {
+        height: template.height,
+        target: template.target,
+        bits: template.bits,
+        txCount: (template.transactions || []).length,
+        coinbasevalue: template.coinbasevalue,
+        payoutAddress: PAYOUT_BTC_ADDRESS,
+        fallbackAddress: FALLBACK_BTC_ADDRESS,
+        timestamp: nowIso()
+      });
+
+      renderBtc();
+      saveState();
+    }
+
+    function stopBtcMode(){
+      for (const worker of state.btc.btcWorkers || []) { worker.postMessage({ type:"stop" }); worker.terminate(); }
+      state.btc.btcWorkers = [];
+    }
+
+    async function startBtcHeaderMiner(){
+      stopAll();
+      stopBtcMode();
+
+      // Always refresh the template before starting so we do not mine stale work.
+      await pullBlockTemplate();
+
+      resetCounters();
+      state.difficulty = 0; // BTC mode uses network target, not local leading-zero difficulty.
+      state.workerCount = Math.max(1, Math.min(16, Number($("workerCount").value || 4)));
+      state.running = true;
+      state.mode = "btc-network";
+      const harmonicCfg = getHarmonicConfig();
+      audit("btc", "btc_header_miner_start", {
+        workers: state.workerCount,
+        height: state.btc.work.template.height,
+        target: state.btc.work.targetHex,
+        harmonicMode: harmonicCfg.mode,
+        harmonicThreshold: harmonicCfg.threshold,
+        submitblock: "armed-network-target-only",
+        payoutAddress: PAYOUT_BTC_ADDRESS,
+        fallbackAddress: FALLBACK_BTC_ADDRESS,
+        timestamp: nowIso()
+      });
+      const blob = new Blob([btcWorkerSource()], { type:"application/javascript" });
+      const url = URL.createObjectURL(blob);
+      const rates = new Map();
+      for (let i=0;i<state.workerCount;i++){
+        const worker = new Worker(url);
+        worker.onmessage = async (event) => {
+          const { type, payload } = event.data || {};
+          if (type === "btc_worker_started") {
+            audit("btc", "btc_worker_started", {
+              workerIndex: payload.workerIndex,
+              workerCount: payload.workerCount,
+              harmonicMode: payload.harmonicMode,
+              harmonicThreshold: payload.harmonicThreshold,
+              timestamp: nowIso()
+            });
+            return;
+          }
+          if (type === "btc_worker_error") {
+            audit("btc", "btc_worker_error", {
+              error: payload.message,
+              timestamp: nowIso()
+            });
+            return;
+          }
+          if (type === "btc_waiting") {
+            state.harmonic = payload.harmonic;
+            const heartbeatNow = Date.now();
+            if (!state.btcLastHeartbeatAt || heartbeatNow - state.btcLastHeartbeatAt > 10000) {
+              state.btcLastHeartbeatAt = heartbeatNow;
+              audit("btc", "btc_harmonic_waiting", {
+                harmonic: state.harmonic || null,
+                harmonicMode: state.harmonicMode,
+                harmonicThreshold: state.harmonicThreshold,
+                height: state.btc.work?.template?.height || null,
+                timestamp: nowIso()
+              });
+            }
+            render();
+            return;
+          }
+          if (type !== "btc_batch") return;
+          state.harmonic = payload.harmonic || state.harmonic;
+          state.hashesTotal += payload.hashes || 0;
+          rates.set(i, payload.hashRate || 0);
+          state.hashRateHps = [...rates.values()].reduce((a,b)=>a+b,0);
+          state.lastHash = payload.lastHash || state.lastHash;
+
+          // Low-frequency heartbeat so the audit log visibly moves while mining,
+          // without filling browser localStorage on every worker batch.
+          const heartbeatNow = Date.now();
+          if (!state.btcLastHeartbeatAt || heartbeatNow - state.btcLastHeartbeatAt > 10000) {
+            state.btcLastHeartbeatAt = heartbeatNow;
+            audit("btc", "btc_hashing_heartbeat", {
+              mode: state.mode,
+              hashesTotal: state.hashesTotal,
+              hashRateHps: Math.round(state.hashRateHps || 0),
+              lastHash: state.lastHash,
+              harmonic: state.harmonic || null,
+              height: state.btc.work?.template?.height || null,
+              target: state.btc.work?.targetHex || null,
+              timestamp: nowIso()
+            });
+          }
+
+          for (const f of payload.found || []){
+            state.sharesFound += 1;
+
+            audit("btc", "network_target_hit", {
+              hash: f.hash,
+              nonce: f.nonce,
+              height: state.btc.work.template.height,
+              target: state.btc.work.targetHex,
+              harmonic: f.harmonic || payload.harmonic || null,
+              payoutAddress: PAYOUT_BTC_ADDRESS,
+              fallbackAddress: FALLBACK_BTC_ADDRESS,
+              timestamp: nowIso()
+            });
+
+            stopBtcMode();
+            state.running = false;
+            state.mode = "btc-solution-found";
+            state.hashRateHps = 0;
+            render();
+            renderBtc();
+
+            try {
+              const submitResult = await submitSolvedBlock(f);
+
+              if (submitResult === null) {
+                audit("btc", "block_accepted_by_core", {
+                  hash: f.hash,
+                  nonce: f.nonce,
+                  height: state.btc.work.template.height,
+                  note: "Bitcoin Core returned null, which means accepted under submitblock semantics.",
+                  timestamp: nowIso()
+                });
+              } else {
+                audit("btc", "block_rejected_by_core", {
+                  hash: f.hash,
+                  nonce: f.nonce,
+                  height: state.btc.work.template.height,
+                  reason: String(submitResult),
+                  timestamp: nowIso()
+                });
+              }
+            } catch (err) {
+              audit("btc", "submitblock_error", {
+                hash: f.hash,
+                nonce: f.nonce,
+                height: state.btc.work?.template?.height,
+                error: String(err.message || err),
+                timestamp: nowIso()
+              });
+            }
+          }
+          state.updatedAt = nowIso();
+          setBoundaryEnvelope("status", currentStatusPayload());
+          saveState();
+          render(); renderBtc();
+        };
+        worker.postMessage({ type:"start_btc", payload:{ work: state.btc.work, workerIndex:i, workerCount:state.workerCount, startNonce:i, harmonicMode:harmonicCfg.mode, harmonicThreshold:harmonicCfg.threshold } });
+        state.btc.btcWorkers.push(worker);
+      }
+      render(); renderBtc();
+    }
+
+
+    $("startCpuBtn").addEventListener("click", startCpuMode);
+    $("startDemoBtn").addEventListener("click", startDemoMode);
+    $("stopBtn").addEventListener("click", stopAll);
+    $("clearBtn").addEventListener("click", () => { state.audit = []; saveState(); renderLog(); });
+    $("exportBtn").addEventListener("click", exportAudit);
+    $("btcSaveRpcBtn").addEventListener("click", saveRpcConfig);
+    $("btcTestBtn").addEventListener("click", () => testBtcNetwork().catch(err => audit("btc", "network_error", { error: String(err.message || err), timestamp: nowIso() })));
+    $("btcTemplateBtn").addEventListener("click", () => { audit("btc", "template_button_clicked", { timestamp: nowIso() }); pullBlockTemplate().catch(err => audit("btc", "template_error", { error: String(err.message || err), timestamp: nowIso() })); });
+    window.auroraFullSystemCheck = function(){
+      const checks = {
+        payoutAddress: PAYOUT_BTC_ADDRESS,
+        fallbackAddress: FALLBACK_BTC_ADDRESS,
+        hasHarmonics: typeof harmonicScoreSnapshot === "function" && typeof shouldHashHarmonic === "function",
+        hasBtcRpc: typeof btcRpc === "function",
+        hasTemplatePull: typeof pullBlockTemplate === "function",
+        hasCoinbaseBuilder: typeof buildCoinbaseTx === "function",
+        hasMerkleBuilder: typeof merkleRootInternal === "function",
+        hasHeaderWorker: typeof btcWorkerSource === "function",
+        hasHeartbeatAudit: true,
+        hasSolvedBlockBuilder: typeof buildSolvedBlockHex === "function",
+        hasSubmitBlock: typeof submitSolvedBlock === "function",
+        poolUsesBtcWork: true,
+        workReady: !!state.btc?.work,
+        height: state.btc?.work?.template?.height || null,
+        target: state.btc?.work?.targetHex || null,
+        note: "This check does not submit anything. It confirms the full harmonic BTC mining and submit path is loaded."
+      };
+      audit("system", "full_system_check", { ...checks, timestamp: nowIso() });
+      return checks;
+    };
+
+    window.auroraSubmitPathCheck = function(){
+      const payload = {
+        ok: !!(state.btc && state.btc.work && typeof submitSolvedBlock === "function" && typeof buildSolvedBlockHex === "function"),
+        hasWork: !!state.btc?.work,
+        height: state.btc?.work?.template?.height || null,
+        txCount: state.btc?.work?.txCount || null,
+        target: state.btc?.work?.targetHex || null,
+        harmonicMode: state.harmonicMode,
+        harmonicThreshold: state.harmonicThreshold,
+        submitFunction: typeof submitSolvedBlock,
+        note: "This does not submit anything. It only confirms the harmonic BTC solved-block submit path is loaded."
+      };
+      audit("btc", "submit_path_check", { ...payload, timestamp: nowIso() });
+      return payload;
+    };
+
+    $("btcStartBtn").addEventListener("click", () => startBtcHeaderMiner().catch(err => audit("btc", "start_error", { error: String(err.message || err), timestamp: nowIso() })));
+    $("btcStopBtn").addEventListener("click", () => { stopBtcMode(); stopAll(); });
+
+
+    if ($("poolStartCoordinatorBtn")) $("poolStartCoordinatorBtn").addEventListener("click", startPoolCoordinator);
+    if ($("poolJoinWorkerBtn")) $("poolJoinWorkerBtn").addEventListener("click", joinPoolAsWorker);
+    if ($("poolStopBtn")) $("poolStopBtn").addEventListener("click", stopPool);
+
+    loadState();
+    loadRpcConfig();
+
+    state.btc.rpcUrl = cleanRpcUrl(state.btc.rpcUrl || "http://127.0.0.1:8787/btc");
+    if (!state.btc.rpcUrl || state.btc.rpcUrl === "http://127.0.0.1:8332") {
+      state.btc.rpcUrl = "http://127.0.0.1:8787/btc";
+    }
+
+    setBoundaryEnvelope("status", currentStatusPayload());
+    render();
+    renderBtc();
+  </script>
+</body>
+</html>
