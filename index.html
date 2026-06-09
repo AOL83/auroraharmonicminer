@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Aurora BTC Harmonic Miner | Auto Submit Build</title>
+  <title>Aurora BTC Harmonic Miner | WebGPU Build</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -92,7 +92,7 @@
   <main class="wrap">
     <section class="hero">
       <h1>⚡ Aurora BTC Harmonic Miner</h1>
-      <p class="sub">BTC Core-connected harmonic header miner. Keeps SSHT π / φ / Fibonacci scoring, pulls real Bitcoin block templates, hashes real block headers, and arms submitblock for a true network-target solution.</p>
+      <p class="sub">BTC Core-connected harmonic header miner. Keeps SSHT π / φ / Fibonacci scoring, pulls real Bitcoin block templates, hashes real block headers, arms submitblock for a true network-target solution, and includes a WebGPU accelerator when the browser supports it.</p>
       <p class="small"><span class="pill">Primary payout stamped</span><span class="pill">Fallback stamped</span><span class="pill">No physical miner dependency</span></p>
     </section>
 
@@ -216,6 +216,27 @@
         <p class="small"><strong>Important:</strong> for a browser page to call Bitcoin Core directly, the RPC endpoint must be reachable by that browser environment and must allow the request origin. Keep credentials private. Use testnet/regtest for first tests.</p><p class="small"><strong>Payout note:</strong> this is not a Coinbase exchange address label. The block-reward output is built to the stamped BTC address above. If that is a Revolut BTC deposit address, confirm Revolut will credit direct mining/block-reward deposits before relying on it.</p>
       </div>
 
+
+      <div class="card span-12">
+        <h2>⚙ WebGPU Accelerator</h2>
+        <p class="small">GPU accelerator for real BTC header work. It keeps the same block template, harmonic gate, Hall of Fame, Neo alerts, and submitblock path. If WebGPU is unavailable, use the CPU BTC Header Miner.</p>
+        <div class="row">
+          <div><label>GPU batch size</label><input id="gpuBatchSize" type="number" min="1024" max="1048576" step="1024" value="65536" /></div>
+          <div><label>GPU workgroup size</label><input id="gpuWorkgroupSize" type="number" min="32" max="256" step="32" value="128" /></div>
+        </div>
+        <div class="btn-row">
+          <button class="ghost" id="gpuCheckBtn">Check WebGPU</button>
+          <button class="start" id="gpuStartBtn">▶ Start GPU BTC Miner</button>
+          <button class="stop" id="gpuStopBtn">⏹ Stop GPU Miner</button>
+        </div>
+        <div class="stats">
+          <div class="stat"><b id="gpuState">Idle</b><span>gpu state</span></div>
+          <div class="stat"><b id="gpuHashRate">0 H/s</b><span>gpu hash rate</span></div>
+          <div class="stat"><b id="gpuBestZeros">0</b><span>best leading zeroes</span></div>
+          <div class="stat"><b id="gpuBatches">0</b><span>gpu batches</span></div>
+        </div>
+        <p class="small">Chrome/Edge WebGPU usually requires hardware acceleration and HTTPS GitHub Pages or localhost.</p>
+      </div>
       <div class="card span-12">
         <h2>Status</h2>
         <div class="stats">
@@ -293,6 +314,7 @@
       updatedAt: null,
       audit: [],
       btc: { rpcUrl: "http://127.0.0.1:8787/btc", rpcUser: "", rpcPass: "", chain: null, height: null, template: null, work: null, btcWorkers: [] },
+      gpu: { supported:false, running:false, adapter:null, device:null, batchSize:65536, workgroupSize:128, nextNonce:0, hashRateHps:0, bestZeros:0, batches:0 },
       pool: {
         channel: null,
         channelName: "aurora-private-browser-pool",
@@ -576,6 +598,7 @@
       if ($("neoZeroThreshold")) $("neoZeroThreshold").value = state.alertConfig?.neoZeroThreshold || 6;
       renderLog();
       renderHallOfFame();
+      renderGpu();
     }
 
     function renderLog(){
@@ -725,6 +748,7 @@
     }
 
     function stopAll(){
+      state.gpu.running = false;
       if (state.demoTimer) {
         clearInterval(state.demoTimer);
         state.demoTimer = null;
@@ -934,7 +958,7 @@
 
               submitSolvedBlock(found).then((submitResult) => {
                 if (submitResult === null) {
-                  showAlert("BLOCK ACCEPTED BY BITCOIN CORE", `Hash ${f.hash}`, "success", { voice:"Block accepted by Bitcoin Core.", browser:true, sticky:true });
+                  showAlert("BLOCK ACCEPTED BY BITCOIN CORE", `Hash ${found.hash}`, "success", { voice:"Block accepted by Bitcoin Core.", browser:true, sticky:true });
                   audit("btc", "block_accepted_by_core", {
                     source: "pool",
                     hash: found.hash,
@@ -1281,6 +1305,64 @@
         runPoolJobOnMainThread(job).then(handleWorkerPayload);
       }
     }
+
+
+    // ===== WEBGPU ACCELERATOR: real BTC header SHA256d batches on GPU =====
+    function renderGpu(){
+      if ($("gpuState")) $("gpuState").textContent = state.gpu.running ? "Running" : (state.gpu.supported ? "Ready" : "Idle");
+      if ($("gpuHashRate")) $("gpuHashRate").textContent = formatRate(state.gpu.hashRateHps || 0);
+      if ($("gpuBestZeros")) $("gpuBestZeros").textContent = String(state.gpu.bestZeros || 0);
+      if ($("gpuBatches")) $("gpuBatches").textContent = formatNum(state.gpu.batches || 0);
+    }
+    async function checkWebGpu(){
+      if (!("gpu" in navigator)) { state.gpu.supported=false; audit("gpu","webgpu_unavailable",{reason:"navigator.gpu missing",timestamp:nowIso()}); showAlert("WebGPU unavailable","Use Chrome/Edge with hardware acceleration from HTTPS/localhost.","error",{voice:"WebGPU unavailable."}); renderGpu(); return false; }
+      const adapter = await navigator.gpu.requestAdapter();
+      if (!adapter) { state.gpu.supported=false; audit("gpu","webgpu_unavailable",{reason:"requestAdapter returned null",timestamp:nowIso()}); showAlert("WebGPU unavailable","No GPU adapter was returned.","error"); renderGpu(); return false; }
+      const device = await adapter.requestDevice();
+      device.lost.then(info => audit("gpu","webgpu_device_lost",{reason:info.reason,message:info.message,timestamp:nowIso()}));
+      state.gpu.adapter=adapter; state.gpu.device=device; state.gpu.supported=true;
+      audit("gpu","webgpu_ready",{timestamp:nowIso()}); showAlert("WebGPU Ready","GPU accelerator is available.","success",{voice:"WebGPU accelerator ready."}); renderGpu(); return true;
+    }
+    function targetBytesFromHex(targetHex){ return new Uint32Array((targetHex.match(/../g)||[]).map(x=>parseInt(x,16))); }
+    function headerPrefixBytes(work){ return new Uint32Array((work.headerPrefixHex.match(/../g)||[]).map(x=>parseInt(x,16))); }
+    function digestWordsToDisplayHash(words){ const bytes=[]; for(const w of words){ bytes.push((w>>>24)&255,(w>>>16)&255,(w>>>8)&255,w&255); } return bytes.reverse().map(b=>b.toString(16).padStart(2,"0")).join(""); }
+    function webgpuShader(wg){ return `
+struct Config{start_nonce:u32,count:u32,pad0:u32,pad1:u32};
+@group(0) @binding(0) var<storage,read> header_prefix:array<u32>;
+@group(0) @binding(1) var<storage,read> target_bytes:array<u32>;
+@group(0) @binding(2) var<storage,read_write> out_data:array<u32>;
+@group(0) @binding(3) var<uniform> cfg:Config;
+const K:array<u32,64>=array<u32,64>(0x428a2f98u,0x71374491u,0xb5c0fbcfu,0xe9b5dba5u,0x3956c25bu,0x59f111f1u,0x923f82a4u,0xab1c5ed5u,0xd807aa98u,0x12835b01u,0x243185beu,0x550c7dc3u,0x72be5d74u,0x80deb1feu,0x9bdc06a7u,0xc19bf174u,0xe49b69c1u,0xefbe4786u,0x0fc19dc6u,0x240ca1ccu,0x2de92c6fu,0x4a7484aau,0x5cb0a9dcu,0x76f988dau,0x983e5152u,0xa831c66du,0xb00327c8u,0xbf597fc7u,0xc6e00bf3u,0xd5a79147u,0x06ca6351u,0x14292967u,0x27b70a85u,0x2e1b2138u,0x4d2c6dfcu,0x53380d13u,0x650a7354u,0x766a0abbu,0x81c2c92eu,0x92722c85u,0xa2bfe8a1u,0xa81a664bu,0xc24b8b70u,0xc76c51a3u,0xd192e819u,0xd6990624u,0xf40e3585u,0x106aa070u,0x19a4c116u,0x1e376c08u,0x2748774cu,0x34b0bcb5u,0x391c0cb3u,0x4ed8aa4au,0x5b9cca4fu,0x682e6ff3u,0x748f82eeu,0x78a5636fu,0x84c87814u,0x8cc70208u,0x90befffau,0xa4506cebu,0xbef9a3f7u,0xc67178f2u);
+fn rotr(x:u32,n:u32)->u32{return (x>>n)|(x<<(32u-n));} fn ch(x:u32,y:u32,z:u32)->u32{return (x&y)^((~x)&z);} fn maj(x:u32,y:u32,z:u32)->u32{return (x&y)^(x&z)^(y&z);} fn bs0(x:u32)->u32{return rotr(x,2u)^rotr(x,13u)^rotr(x,22u);} fn bs1(x:u32)->u32{return rotr(x,6u)^rotr(x,11u)^rotr(x,25u);} fn ss0(x:u32)->u32{return rotr(x,7u)^rotr(x,18u)^(x>>3u);} fn ss1(x:u32)->u32{return rotr(x,17u)^rotr(x,19u)^(x>>10u);}
+fn init_state()->array<u32,8>{return array<u32,8>(0x6a09e667u,0xbb67ae85u,0x3c6ef372u,0xa54ff53au,0x510e527fu,0x9b05688cu,0x1f83d9abu,0x5be0cd19u);} 
+fn compress(s:array<u32,8>,b:array<u32,16>)->array<u32,8>{var w:array<u32,64>; for(var i:u32=0u;i<16u;i=i+1u){w[i]=b[i];} for(var i:u32=16u;i<64u;i=i+1u){w[i]=ss1(w[i-2u])+w[i-7u]+ss0(w[i-15u])+w[i-16u];} var a=s[0];var bb=s[1];var c=s[2];var d=s[3];var e=s[4];var f=s[5];var g=s[6];var h=s[7]; for(var i:u32=0u;i<64u;i=i+1u){let t1=h+bs1(e)+ch(e,f,g)+K[i]+w[i];let t2=bs0(a)+maj(a,bb,c);h=g;g=f;f=e;e=d+t1;d=c;c=bb;bb=a;a=t1+t2;} return array<u32,8>(s[0]+a,s[1]+bb,s[2]+c,s[3]+d,s[4]+e,s[5]+f,s[6]+g,s[7]+h);}
+fn wb(a:u32,b:u32,c:u32,d:u32)->u32{return (a<<24u)|(b<<16u)|(c<<8u)|d;} fn pb(i:u32)->u32{return header_prefix[i]&255u;} fn db(h:array<u32,8>,i:u32)->u32{let w=h[i/4u];let sh=24u-((i%4u)*8u);return (w>>sh)&255u;}
+fn zeros(h:array<u32,8>)->u32{var n:u32=0u; for(var i:u32=0u;i<32u;i=i+1u){let b=db(h,31u-i);let hi=(b>>4u)&15u;let lo=b&15u; if(hi==0u){n=n+1u;}else{return n;} if(lo==0u){n=n+1u;}else{return n;}} return n;}
+fn target_ok(h:array<u32,8>)->u32{for(var i:u32=0u;i<32u;i=i+1u){let hb=db(h,31u-i);let tb=target_bytes[i]&255u;if(hb<tb){return 1u;} if(hb>tb){return 0u;}} return 1u;}
+fn sha256d(nonce:u32)->array<u32,8>{var b0:array<u32,16>; for(var i:u32=0u;i<16u;i=i+1u){b0[i]=wb(pb(i*4u),pb(i*4u+1u),pb(i*4u+2u),pb(i*4u+3u));} var s=compress(init_state(),b0); let n0=nonce&255u;let n1=(nonce>>8u)&255u;let n2=(nonce>>16u)&255u;let n3=(nonce>>24u)&255u; var b1:array<u32,16>; b1[0]=wb(pb(64u),pb(65u),pb(66u),pb(67u)); b1[1]=wb(pb(68u),pb(69u),pb(70u),pb(71u)); b1[2]=wb(pb(72u),pb(73u),pb(74u),pb(75u)); b1[3]=wb(n0,n1,n2,n3); b1[4]=0x80000000u; for(var i:u32=5u;i<15u;i=i+1u){b1[i]=0u;} b1[15]=640u; s=compress(s,b1); var b2:array<u32,16>; for(var i:u32=0u;i<8u;i=i+1u){b2[i]=s[i];} b2[8]=0x80000000u; for(var i:u32=9u;i<15u;i=i+1u){b2[i]=0u;} b2[15]=256u; return compress(init_state(),b2);}
+@compute @workgroup_size(${wg}) fn main(@builtin(global_invocation_id) gid:vec3<u32>){let idx=gid.x; if(idx>=cfg.count){return;} let nonce=cfg.start_nonce+idx; let h=sha256d(nonce); let base=idx*12u; out_data[base]=zeros(h); out_data[base+1u]=nonce; out_data[base+2u]=target_ok(h); for(var i:u32=0u;i<8u;i=i+1u){out_data[base+3u+i]=h[i];} out_data[base+11u]=0u;}`; }
+    async function runGpuBatch(){
+      if(!state.btc.work) await pullBlockTemplate();
+      if(!state.gpu.device){ const ok=await checkWebGpu(); if(!ok) return null; }
+      const device=state.gpu.device, batchSize=Math.max(1024,Math.min(1048576,Number($("gpuBatchSize")?.value||65536))), wg=Math.max(32,Math.min(256,Number($("gpuWorkgroupSize")?.value||128)));
+      state.gpu.batchSize=batchSize; state.gpu.workgroupSize=wg;
+      const prefix=headerPrefixBytes(state.btc.work), target=targetBytesFromHex(state.btc.work.targetHex), outputWords=batchSize*12;
+      const prefixBuffer=device.createBuffer({size:prefix.byteLength,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}); device.queue.writeBuffer(prefixBuffer,0,prefix);
+      const targetBuffer=device.createBuffer({size:target.byteLength,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST}); device.queue.writeBuffer(targetBuffer,0,target);
+      const outBuffer=device.createBuffer({size:outputWords*4,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}); const readBuffer=device.createBuffer({size:outputWords*4,usage:GPUBufferUsage.MAP_READ|GPUBufferUsage.COPY_DST});
+      const config=new Uint32Array([state.gpu.nextNonce>>>0,batchSize>>>0,0,0]); const configBuffer=device.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}); device.queue.writeBuffer(configBuffer,0,config);
+      const module=device.createShaderModule({code:webgpuShader(wg)}); const pipeline=device.createComputePipeline({layout:"auto",compute:{module,entryPoint:"main"}});
+      const bindGroup=device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:prefixBuffer}},{binding:1,resource:{buffer:targetBuffer}},{binding:2,resource:{buffer:outBuffer}},{binding:3,resource:{buffer:configBuffer}}]});
+      const encoder=device.createCommandEncoder(); const pass=encoder.beginComputePass(); pass.setPipeline(pipeline); pass.setBindGroup(0,bindGroup); pass.dispatchWorkgroups(Math.ceil(batchSize/wg)); pass.end(); encoder.copyBufferToBuffer(outBuffer,0,readBuffer,0,outputWords*4);
+      const started=performance.now(); device.queue.submit([encoder.finish()]); await readBuffer.mapAsync(GPUMapMode.READ); const result=new Uint32Array(readBuffer.getMappedRange().slice(0)); readBuffer.unmap(); const elapsed=Math.max((performance.now()-started)/1000,.0001);
+      let bestZeros=-1,bestNonce=0,bestWords=null,hit=null; for(let i=0;i<batchSize;i++){const base=i*12,z=result[base]; if(z>bestZeros){bestZeros=z;bestNonce=result[base+1]>>>0;bestWords=Array.from(result.slice(base+3,base+11));} if(result[base+2]===1 && !hit){hit={nonce:result[base+1]>>>0,words:Array.from(result.slice(base+3,base+11))};}}
+      const bestHash=digestWordsToDisplayHash(bestWords||[]), harmonic=harmonicScoreSnapshot(state.harmonicThreshold); state.harmonic=harmonic; checkAlignmentAlert(harmonic); state.gpu.nextNonce=(state.gpu.nextNonce+batchSize)>>>0; state.gpu.batches+=1; state.gpu.hashRateHps=batchSize/elapsed; state.gpu.bestZeros=Math.max(state.gpu.bestZeros||0,bestZeros||0); state.hashesTotal+=batchSize; state.hashRateHps=state.gpu.hashRateHps; state.lastHash=bestHash; state.updatedAt=nowIso(); addHallOfFame(bestHash,{source:"webgpu",nonce:bestNonce,height:state.btc.work?.template?.height,harmonic}); audit("gpu","webgpu_batch_done",{batchSize,hashRateHps:Math.round(state.gpu.hashRateHps),startNonce:config[0],nextNonce:state.gpu.nextNonce,bestZeros,bestNonce,bestHash,harmonic,height:state.btc.work?.template?.height,timestamp:nowIso()});
+      if(hit){const hitHash=digestWordsToDisplayHash(hit.words); const solution={nonce:hit.nonce,hash:hitHash,headerHex:state.btc.work.headerPrefixHex+u32le(hit.nonce),harmonic}; showAlert("NETWORK TARGET HIT FROM GPU",`Hash ${hitHash}. Attempting submitblock.`,"danger",{voice:"Attention. Network target hit from GPU. Attempting submit block.",browser:true,sticky:true}); addHallOfFame(hitHash,{source:"gpu-network-target",nonce:hit.nonce,height:state.btc.work?.template?.height,harmonic,force:true}); audit("btc","network_target_hit",{source:"webgpu",hash:hitHash,nonce:hit.nonce,height:state.btc.work?.template?.height,target:state.btc.work?.targetHex,harmonic,timestamp:nowIso()}); state.gpu.running=false; const submitResult=await submitSolvedBlock(solution); if(submitResult===null){showAlert("BLOCK ACCEPTED BY BITCOIN CORE",`Hash ${hitHash}`,"success",{voice:"Block accepted by Bitcoin Core.",browser:true,sticky:true}); audit("btc","block_accepted_by_core",{source:"webgpu",hash:hitHash,nonce:hit.nonce,height:state.btc.work?.template?.height,timestamp:nowIso()});}else{showAlert("Block Rejected By Core",String(submitResult),"error",{voice:"Block rejected by Bitcoin Core.",browser:true,sticky:true}); audit("btc","block_rejected_by_core",{source:"webgpu",hash:hitHash,nonce:hit.nonce,height:state.btc.work?.template?.height,reason:String(submitResult),timestamp:nowIso()});}}
+      saveState(); render(); renderGpu(); return {bestHash,bestZeros,hit};
+    }
+    async function startGpuMiner(){ stopAll(); stopBtcMode(); await pullBlockTemplate(); resetCounters(); const cfg=getHarmonicConfig(); state.gpu.running=true; state.running=true; state.mode="webgpu-btc"; state.gpu.nextNonce=0; state.gpu.batches=0; state.gpu.bestZeros=0; audit("gpu","webgpu_miner_start",{height:state.btc.work?.template?.height,batchSize:Number($("gpuBatchSize")?.value||65536),workgroupSize:Number($("gpuWorkgroupSize")?.value||128),harmonicMode:cfg.mode,harmonicThreshold:cfg.threshold,submitblock:"armed-network-target-only",timestamp:nowIso()}); showAlert("WebGPU Miner Started","GPU BTC header hashing is running.","success",{voice:"WebGPU miner started."}); renderGpu(); while(state.gpu.running){const h=harmonicScoreSnapshot(cfg.threshold); state.harmonic=h; if(!shouldHashHarmonic(h,cfg.mode)){audit("gpu","webgpu_harmonic_waiting",{harmonic:h,timestamp:nowIso()}); checkAlignmentAlert(h); render(); await new Promise(r=>setTimeout(r,250)); continue;} try{await runGpuBatch();}catch(err){state.gpu.running=false; state.running=false; audit("gpu","webgpu_error",{error:String(err.message||err),timestamp:nowIso()}); showAlert("WebGPU Error",String(err.message||err),"error",{voice:"WebGPU error.",browser:true}); break;} await new Promise(r=>setTimeout(r,0));} renderGpu(); }
+    function stopGpuMiner(){ state.gpu.running=false; if(state.mode==="webgpu-btc"){state.running=false;state.mode="idle";state.hashRateHps=0;} audit("gpu","webgpu_miner_stop",{timestamp:nowIso()}); render(); renderGpu(); }
+
 
     // ===== BTC NETWORK ADAPTER: real Bitcoin Core RPC + block-template header work =====
     const BTC_RPC_STORAGE_KEY = "aurora_btc_rpc_config_v1";
@@ -1899,6 +1981,9 @@
     $("stopBtn").addEventListener("click", stopAll);
     $("clearBtn").addEventListener("click", () => { state.audit = []; saveState(); renderLog(); });
     $("exportBtn").addEventListener("click", exportAudit);
+    if ($("gpuCheckBtn")) $("gpuCheckBtn").addEventListener("click", () => checkWebGpu().catch(err => { audit("gpu","webgpu_check_error",{error:String(err.message||err),timestamp:nowIso()}); showAlert("WebGPU Check Error",String(err.message||err),"error"); }));
+    if ($("gpuStartBtn")) $("gpuStartBtn").addEventListener("click", () => startGpuMiner().catch(err => { audit("gpu","webgpu_start_error",{error:String(err.message||err),timestamp:nowIso()}); showAlert("WebGPU Start Error",String(err.message||err),"error",{voice:"WebGPU start error.",browser:true}); }));
+    if ($("gpuStopBtn")) $("gpuStopBtn").addEventListener("click", stopGpuMiner);
     if ($("testAlertBtn")) $("testAlertBtn").addEventListener("click", () => {
       showAlert("Aurora Test Alert", "Neo alert system online.", "neo", { voice:"Aurora alert system online." });
       addHallOfFame("000000" + Math.random().toString(16).slice(2).padEnd(58,"0"), { source:"test", force:true });
@@ -1977,6 +2062,7 @@
     setBoundaryEnvelope("status", currentStatusPayload());
     render();
     renderBtc();
+    renderGpu();
     renderHallOfFame();
   </script>
 
